@@ -1,5 +1,7 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenAI, GenerationConfig, Content } from "@google/genai";
 import { Chat } from "../state/slices/chatSlice";
+
+export type StreamEvent = { text?: string; thought?: string };
 
 /**
  * Calls the Gemini API with a structured prompt and returns a streaming response.
@@ -10,6 +12,7 @@ import { Chat } from "../state/slices/chatSlice";
  * @param problemDetails - The details of the LeetCode problem.
  * @param userCode - The user's code.
  * @param currentUserMessage - The user's latest message.
+ * @param streamThoughts - Whether to stream thinking responses.
  * @returns An async generator that yields text chunks as they are generated.
  */
 export const callGeminiApi = async function* (
@@ -19,7 +22,8 @@ export const callGeminiApi = async function* (
   problemDetails: string | null,
   userCode: string | null,
   currentUserMessage: string,
-): AsyncGenerator<string, void, unknown> {
+  streamThoughts: boolean,
+) {
   if (!apiKey || typeof apiKey !== "string") {
     throw new Error("Invalid API key provided.");
   }
@@ -34,49 +38,68 @@ Adapt your style dynamically based on how the user interacts:
 - If they are brainstorming casually, be a friendly coding buddy.
 
 When context is provided (like problem details or code), use it only if it is relevant to the user's current message.
-- If the user asks something that requires context (e.g., questions about their code or a problem) but no context was provided, ask them politely to click on \`Add Context\` and select the context (problem details or code) that is missing in the user's input.
+- If the user asks something that requires context (e.g., questions about their code or a problem) but no context was provided, ask them politely to click on 
+Add Context
+ and select the context (problem details or code) that is missing in the user's input.
 - If the user's message is unrelated to the provided context (for example, a greeting or a casual question), ignore the context and respond naturally to their message alone.
 
 Always keep responses concise, structured, and practical for competitive programming.
 `;
 
-  const conversationHistory = chatHistory
-    .map((m) => `${m.isUser ? "User" : "Assistant"}: ${m.text}`)
-    .join("\n");
-
-  const contextBlock = `
-Problem Details:
-${problemDetails || "No problem details provided."}
-
-User Code:
-${userCode || "No code provided."}
-`;
-
-  const finalPrompt = `
-${systemPrompt}
-
-Conversation so far:
-${conversationHistory}
-
-Current context:
-${contextBlock}
-
-User's latest message to respond to:
-${currentUserMessage}
-`;
+  const contents: Content[] = [
+    ...chatHistory.map((m) => ({
+      role: m.isUser ? "user" : "model",
+      parts: [{ text: m.text }],
+    })),
+    {
+      role: "user",
+      parts: [
+        {
+          text: `Problem Details:
+          ${
+            problemDetails || "No problem details provided."
+          }\n\nUser Code:\n${userCode || "No code provided."}`,
+        },
+        { text: currentUserMessage },
+      ],
+    },
+  ];
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: modelName });
+    const genAI = new GoogleGenAI({ apiKey });
+    const generationConfig: GenerationConfig = {
+      temperature: 0.3,
+      topP: 0.9,
+      topK: 40,
+    };
 
-    const result = await model.generateContentStream(finalPrompt);
+    if (streamThoughts) {
+      generationConfig.thinkingConfig = {
+        includeThoughts: true,
+        thinkingBudget: -1,
+      };
+    }
 
-    for await (const chunk of result.stream) {
-      if (chunk && chunk.text) {
-        // Check if chunk exists and has text method
-        const chunkText = chunk.text();
-        if (chunkText) {
-          yield chunkText;
+    const response = await genAI.models.generateContentStream({
+      model: modelName,
+      config: {
+        ...generationConfig,
+        systemInstruction: systemPrompt,
+      },
+      contents,
+    });
+
+    for await (const chunk of response) {
+      if (!chunk.candidates?.[0]?.content?.parts) {
+        continue;
+      }
+      for (const part of chunk.candidates[0].content.parts) {
+        if (!part.text) {
+          continue;
+        } else if (part.thought) {
+          yield { thought: part.text };
+        } else {
+          yield { text: part.text };
         }
       }
     }
