@@ -4,9 +4,10 @@ module.exports = {
     "^.+\\.(js|jsx|ts|tsx)$": "babel-jest",
   },
   transformIgnorePatterns: [
-    "/node_modules/(?!(react-markdown|vfile|unist-util-stringify-position|unified|bail|is-plain-obj|decode-named-character-reference|remark-parse|mdast-util-from-markdown|micromark|micromark-util-decode-numeric-character-reference|micromark-util-encode|micromark-util-html-tag-name|micromark-util-sanitize-uri|micromark-util-symbol|parse-entities|ccount|escape-string-regexp|markdown-table|trim-lines|devlop|hast-util-to-jsx-runtime)/)",
+    "/node_modules/(?!(react-markdown|vfile|unist-util-stringify-position|unified|bail|is-plain-obj|decode-named-character-reference|remark-parse|mdast-util-from-markdown|micromark|micromark-util-decode-numeric-character-reference|micromark-util-encode|micromark-util-html-tag-name|micromark-util-sanitize-uri|micromark-util-symbol|parse-entities|ccount|escape-string-regexp|markdown-table|trim-lines|devlop|hast-util-to-jsx-runtime|@google/genai)/)",
   ],
   moduleNameMapper: {
+    "^@google/genai$": "<rootDir>/src/tests/mocks/google-genai.ts",
     "\\.(css|less|scss|sass)$": "identity-obj-proxy",
     "^@/(.*)$": "<rootDir>/src/$1",
     "^react-markdown$": "<rootDir>/src/tests/mocks/react-markdown.tsx",
