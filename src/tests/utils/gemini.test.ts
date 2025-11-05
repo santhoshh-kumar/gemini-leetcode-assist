@@ -120,10 +120,10 @@ describe("callGeminiApi", () => {
     const callArgs = mockGenerateContentStream.mock.calls[0][0];
     expect(callArgs.model).toBe(modelName);
     expect(callArgs.config.systemInstruction).toContain(
-      "You are an expert competitive programmer and mentor.",
+      "You are an expert competitive programmer and mentor",
     );
     expect(callArgs.contents).toHaveLength(3); // chat history + user message parts
-    expect(callArgs.contents[2].parts[1].text).toBe(currentUserMessage);
+    expect(callArgs.contents[2].parts[0].text).toContain(currentUserMessage);
   });
 
   it("should handle null problemDetails and userCode", async () => {
@@ -154,11 +154,14 @@ describe("callGeminiApi", () => {
     await generator.next();
 
     const callArgs = mockGenerateContentStream.mock.calls[0][0];
-    expect(callArgs.contents[2].parts[0].text).toContain(
-      "Problem Details:\nNo problem details provided.",
+    expect(callArgs.contents[2].parts[0].text).toMatch(
+      /Problem Details:\s*No problem details provided\./,
     );
-    expect(callArgs.contents[2].parts[0].text).toContain(
-      "User Code:\nNo code provided.",
+    expect(callArgs.contents[2].parts[0].text).toMatch(
+      /User Code:\s*No code provided\./,
+    );
+    expect(callArgs.contents[2].parts[0].text).toMatch(
+      /User's latest message to respond to: How do I solve this\?/,
     );
   });
 

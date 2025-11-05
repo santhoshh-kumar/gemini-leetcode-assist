@@ -72,6 +72,9 @@ export const callGeminiApi = async function* (
     **FORMATTING REQUIREMENTS - USE THESE MARKDOWN FORMATS EXTENSIVELY:**
 
     - **Tables** for: algorithm comparisons, time/space complexity analysis, simple test cases, simple dry runs
+      * Always use proper Markdown table syntax with | separators and --- header separators
+      * Ensure tables are properly formatted with consistent column alignment
+      * Example: | Column1 | Column2 |\n|---------|---------|\n| Value1  | Value2  |
     - **Nested Lists** for: step-by-step algorithms, decision trees, hierarchical concepts, complex test cases, complex dry runs
     - **Code Blocks** for: code examples, pseudocode, mathematical formulas
     - **Headers** to organize: approach explanations, solution steps, key concepts
@@ -92,11 +95,13 @@ export const callGeminiApi = async function* (
       parts: [
         {
           text: `Problem Details:
-          ${
-            problemDetails || "No problem details provided."
-          }\n\nUser Code:\n${userCode || "No code provided."}`,
+          ${problemDetails || "No problem details provided."}
+
+          User Code:
+          ${userCode || "No code provided."}
+
+          User's latest message to respond to: ${currentUserMessage}`,
         },
-        { text: currentUserMessage },
       ],
     },
   ];
