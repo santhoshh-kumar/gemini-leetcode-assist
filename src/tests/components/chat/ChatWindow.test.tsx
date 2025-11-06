@@ -170,16 +170,17 @@ describe("ChatWindow", () => {
     await renderWithStore(store);
 
     expect(await screen.findByText("Hello, LeetCoder")).toBeInTheDocument();
-    // The welcome text may include the prettified problem title derived from the URL
-    // (the DOM may split text across nodes), so match flexibly by checking both
-    // the helper phrase and the problem title are present in the same element.
-    expect(
-      await screen.findByText(
-        (content) =>
-          content.includes("How can I assist you with") &&
-          content.includes("Two Sum"),
-      ),
-    ).toBeInTheDocument();
+
+    // Find the welcome message container and verify its content
+    const welcomeContainer = await screen
+      .findByText("Hello, LeetCoder")
+      .then(
+        (element) =>
+          element.closest(".flex.flex-col.items-center") as HTMLElement,
+      );
+    expect(welcomeContainer).toBeInTheDocument();
+    expect(welcomeContainer.textContent).toContain("How can I assist you with");
+    expect(welcomeContainer.textContent).toContain("Two Sum");
   });
 
   it("displays a welcome message with the problem title", async () => {
@@ -192,9 +193,17 @@ describe("ChatWindow", () => {
     const store = mockStore(createMockState());
     await renderWithStore(store);
 
-    expect(
-      await screen.findByText("How can I assist you with Two Sum problem?"),
-    ).toBeInTheDocument();
+    // Find the welcome message container and verify its content
+    const welcomeContainer = await screen
+      .findByText("Hello, LeetCoder")
+      .then(
+        (element) =>
+          element.closest(".flex.flex-col.items-center") as HTMLElement,
+      );
+    expect(welcomeContainer).toBeInTheDocument();
+    expect(welcomeContainer.textContent).toContain("How can I assist you with");
+    expect(welcomeContainer.textContent).toContain("Two Sum");
+    expect(welcomeContainer.textContent).toContain("problem?");
   });
 
   it("dispatches loadChats on mount if problem slug exists", async () => {
@@ -662,6 +671,7 @@ describe("ChatWindow", () => {
       expect.stringContaining("Two Sum"),
       "function solution() {}",
       "Test streaming message",
+      true,
     );
   });
 

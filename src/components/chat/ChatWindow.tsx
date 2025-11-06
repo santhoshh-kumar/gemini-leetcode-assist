@@ -21,12 +21,15 @@ import {
   updateStreamingMessage,
   finishStreamingMessageAndSave,
   failStreamingMessage,
+  updateThinkingState,
+  setThinkingStartTime,
+  setThinkingEndTime,
 } from "@/state/slices/chatSlice";
 import { nanoid } from "@reduxjs/toolkit";
 import { setError, clearError } from "@/state/slices/apiSlice";
 import { callGeminiApi } from "@/utils/gemini";
 import { loadApiKey } from "@/state/slices/settingsSlice";
-import { X, Minus, Bot, Maximize2, Plus, History } from "lucide-react";
+import { X, Bot, Maximize2, Plus, History, Minimize2 } from "lucide-react";
 
 const ChatWindow: FC = () => {
   const dispatch: AppDispatch = useDispatch();
@@ -206,16 +209,50 @@ const ChatWindow: FC = () => {
         problemDetails,
         userCode,
         text,
+        true, // streamThoughts
       );
 
       for await (const chunk of streamGenerator) {
-        dispatch(
-          updateStreamingMessage({
-            chatId,
-            messageId: assistantMessageId,
-            textChunk: chunk,
-          }),
-        );
+        // Handle thinking start time
+        if (chunk.thinkingStartTime) {
+          dispatch(
+            setThinkingStartTime({
+              chatId,
+              messageId: assistantMessageId,
+              timestamp: chunk.thinkingStartTime,
+            }),
+          );
+        }
+
+        // Handle thinking end time
+        if (chunk.thinkingEndTime) {
+          dispatch(
+            setThinkingEndTime({
+              chatId,
+              messageId: assistantMessageId,
+              timestamp: chunk.thinkingEndTime,
+            }),
+          );
+        }
+
+        if (chunk.thought) {
+          console.log("Dispatched thought:", chunk.thought);
+          dispatch(
+            updateThinkingState({
+              chatId,
+              messageId: assistantMessageId,
+              thought: chunk.thought,
+            }),
+          );
+        } else if (chunk.text !== undefined) {
+          dispatch(
+            updateStreamingMessage({
+              chatId,
+              messageId: assistantMessageId,
+              textChunk: chunk.text,
+            }),
+          );
+        }
         // Scroll to bottom as new content streams in, but only if the user
         // is at (or near) the bottom. If the user scrolled up we respect
         // their position and avoid forcing the viewport back down.
@@ -302,7 +339,11 @@ const ChatWindow: FC = () => {
               className="handle flex items-center justify-between w-full h-10 px-4 cursor-move flex-shrink-0"
               style={{
                 background:
-                  "linear-gradient(to right, rgba(126, 34, 206, 0.65), rgba(59, 130, 246, 0.65), rgba(6, 182, 212, 0.65))",
+                  "linear-gradient(180deg, rgba(43, 90, 160, 0.75) 0%, rgba(36, 75, 140, 0.75) 100%)",
+                backdropFilter: "blur(4px)",
+                border: "1px solid rgba(0, 0, 0, 0.25)",
+                boxShadow:
+                  "0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 1px 3px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05)",
               }}
             >
               <div className="flex items-center gap-2">
@@ -338,7 +379,7 @@ const ChatWindow: FC = () => {
                   {isChatMinimized ? (
                     <Maximize2 size={16} />
                   ) : (
-                    <Minus size={16} />
+                    <Minimize2 size={16} />
                   )}
                 </button>
                 <button
@@ -361,24 +402,22 @@ const ChatWindow: FC = () => {
                 >
                   {messages.length === 0 && !isLoading ? (
                     <div className="flex flex-col items-center justify-center h-full text-center text-white">
-                      <h2 className="text-xl font-bold">
-                        <span
-                          style={{
-                            background:
-                              "linear-gradient(to right, #8b5cf6, #3b82f6, #06b6d4)",
-                            WebkitBackgroundClip: "text",
-                            WebkitTextFillColor: "transparent",
-                          }}
-                        >
-                          Hello, LeetCoder
-                        </span>
+                      <h2 className="text-xl">
+                        <span className="user-greeting">Hello, LeetCoder</span>
                       </h2>
                       <h1>
                         <span className="text-white/70">
                           How can I assist you with{" "}
-                          {problemTitle
-                            ? `${problemTitle} problem`
-                            : "this problem"}
+                          {problemTitle ? (
+                            <>
+                              <strong className="text-white/75">
+                                {problemTitle}
+                              </strong>{" "}
+                              problem
+                            </>
+                          ) : (
+                            "this problem"
+                          )}
                           ?
                         </span>
                       </h1>
@@ -391,6 +430,9 @@ const ChatWindow: FC = () => {
                           text={msg.text}
                           isUser={msg.isUser}
                           status={msg.status}
+                          thinking={msg.thinking}
+                          thinkingStartTime={msg.thinkingStartTime}
+                          thinkingEndTime={msg.thinkingEndTime}
                         />
                       ))}
                     </>

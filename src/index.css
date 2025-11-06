@@ -29,3 +29,11 @@
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
+
+/* Greeting style (moved from inline styles in ChatWindow) */
+.user-greeting {
+  color: #1e88ff;
+  -webkit-font-smoothing: antialiased;
+  font-weight: 600;
+  display: inline-block;
+}

@@ -11,6 +11,9 @@ export interface ChatMessage {
   text: string;
   isUser: boolean;
   status: "sending" | "succeeded" | "failed" | "streaming";
+  thinking?: string[] | null;
+  thinkingStartTime?: number; // Unix timestamp in ms
+  thinkingEndTime?: number; // Unix timestamp in ms
 }
 
 export interface Chat {
@@ -184,6 +187,27 @@ const chatSlice = createSlice({
         chat.lastUpdated = Date.now();
       }
     },
+    updateThinkingState: (
+      state,
+      action: PayloadAction<{
+        chatId: string;
+        messageId: string;
+        thought: string;
+      }>,
+    ) => {
+      const { chatId, messageId, thought } = action.payload;
+      const chat = state.chats.find((c) => c.id === chatId);
+      if (chat) {
+        const message = chat.messages.find((m) => m.id === messageId);
+        if (message) {
+          // Initialize thinking array if not exists, then append new thought
+          if (!message.thinking) {
+            message.thinking = [];
+          }
+          message.thinking.push(thought);
+        }
+      }
+    },
     startStreamingMessage: (
       state,
       action: PayloadAction<{
@@ -200,6 +224,7 @@ const chatSlice = createSlice({
           text,
           isUser: false,
           status: "streaming",
+          thinking: [],
         });
         chat.lastUpdated = Date.now();
       }
@@ -235,6 +260,40 @@ const chatSlice = createSlice({
         if (message && message.status === "streaming") {
           message.status = "succeeded";
           chat.lastUpdated = Date.now();
+        }
+      }
+    },
+    setThinkingStartTime: (
+      state,
+      action: PayloadAction<{
+        chatId: string;
+        messageId: string;
+        timestamp: number;
+      }>,
+    ) => {
+      const { chatId, messageId, timestamp } = action.payload;
+      const chat = state.chats.find((c) => c.id === chatId);
+      if (chat) {
+        const message = chat.messages.find((m) => m.id === messageId);
+        if (message) {
+          message.thinkingStartTime = timestamp;
+        }
+      }
+    },
+    setThinkingEndTime: (
+      state,
+      action: PayloadAction<{
+        chatId: string;
+        messageId: string;
+        timestamp: number;
+      }>,
+    ) => {
+      const { chatId, messageId, timestamp } = action.payload;
+      const chat = state.chats.find((c) => c.id === chatId);
+      if (chat) {
+        const message = chat.messages.find((m) => m.id === messageId);
+        if (message) {
+          message.thinkingEndTime = timestamp;
         }
       }
     },
@@ -401,6 +460,9 @@ export const {
   setCurrentChat,
   newChat,
   updateChatTimestamp,
+  updateThinkingState,
+  setThinkingStartTime,
+  setThinkingEndTime,
   startStreamingMessage,
   updateStreamingMessage,
   finishStreamingMessage,

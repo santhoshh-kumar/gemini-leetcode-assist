@@ -1,7 +1,12 @@
 import { GoogleGenAI, GenerationConfig, Content } from "@google/genai";
 import { Chat } from "../state/slices/chatSlice";
 
-export type StreamEvent = { text?: string; thought?: string };
+export type StreamEvent = {
+  text?: string;
+  thought?: string;
+  thinkingStartTime?: number;
+  thinkingEndTime?: number;
+};
 
 /**
  * Calls the Gemini API with a structured prompt and returns a streaming response.
@@ -130,6 +135,10 @@ export const callGeminiApi = async function* (
       contents,
     });
 
+    let thinkingStartTime: number | undefined;
+    let thinkingEndTime: number | undefined;
+    let hasThinking = false;
+
     for await (const chunk of response) {
       if (!chunk.candidates?.[0]?.content?.parts) {
         continue;
@@ -138,9 +147,22 @@ export const callGeminiApi = async function* (
         if (!part.text) {
           continue;
         } else if (part.thought) {
-          yield { thought: part.text };
+          // First thought - record start time
+          if (!hasThinking) {
+            thinkingStartTime = Date.now();
+            hasThinking = true;
+            yield { thought: part.text, thinkingStartTime };
+          } else {
+            yield { thought: part.text };
+          }
         } else {
-          yield { text: part.text };
+          // First text chunk after thinking - record end time
+          if (hasThinking && !thinkingEndTime) {
+            thinkingEndTime = Date.now();
+            yield { text: part.text, thinkingEndTime };
+          } else {
+            yield { text: part.text };
+          }
         }
       }
     }

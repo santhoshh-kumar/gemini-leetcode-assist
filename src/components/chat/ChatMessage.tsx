@@ -1,10 +1,12 @@
 import { FC } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import "./ChatMessage.css";
 import CopyButton from "./CopyButton";
+import ThinkingDropdown from "./ThinkingDropdown";
 
 type MessageShape = {
   id?: string;
@@ -17,10 +19,16 @@ type ChatMessageProps =
       text: string;
       isUser: boolean;
       status?: "sending" | "succeeded" | "failed" | "streaming";
+      thinking?: string[] | null;
+      thinkingStartTime?: number;
+      thinkingEndTime?: number;
     }
   | {
       message: MessageShape & {
         status?: "sending" | "succeeded" | "failed" | "streaming";
+        thinking?: string[] | null;
+        thinkingStartTime?: number;
+        thinkingEndTime?: number;
       };
     };
 
@@ -35,6 +43,30 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
       : "message" in props
         ? props.message?.status
         : undefined;
+  const thinking =
+    "thinking" in props
+      ? props.thinking
+      : "message" in props
+        ? props.message?.thinking
+        : undefined;
+  const thinkingStartTime =
+    "thinkingStartTime" in props
+      ? props.thinkingStartTime
+      : "message" in props
+        ? props.message?.thinkingStartTime
+        : undefined;
+  const thinkingEndTime =
+    "thinkingEndTime" in props
+      ? props.thinkingEndTime
+      : "message" in props
+        ? props.message?.thinkingEndTime
+        : undefined;
+
+  // Calculate thinking duration in seconds
+  const thinkingDuration =
+    thinkingStartTime != null && thinkingEndTime != null
+      ? Math.round((thinkingEndTime - thinkingStartTime) / 1000)
+      : undefined;
 
   if (isUser) {
     return (
@@ -52,37 +84,51 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
     );
   }
 
+  const hasThinking = thinking && thinking.length > 0;
+  const isStreaming = status === "streaming";
+
   return (
     <div className="flex justify-start mb-4 bot-message">
       <div className="text-white max-w-[100%] markdown-container">
-        <ReactMarkdown
-          remarkPlugins={[remarkGfm]}
-          components={{
-            code({ className, children, ...props }) {
-              const match = /language-(\w+)/.exec(className || "");
-              const codeText = String(children).replace(/\n$/, "");
-              return match ? (
-                <div className="relative">
-                  <CopyButton textToCopy={codeText} />
-                  <SyntaxHighlighter
-                    className="custom-scrollbar"
-                    style={vscDarkPlus}
-                    language={match[1]}
-                    PreTag="div"
-                  >
-                    {codeText}
-                  </SyntaxHighlighter>
-                </div>
-              ) : (
-                <code className={className} {...props}>
-                  {children}
-                </code>
-              );
-            },
-          }}
-        >
-          {text}
-        </ReactMarkdown>
+        <>
+          {hasThinking && (
+            <ThinkingDropdown
+              thinking={thinking}
+              isStreaming={isStreaming}
+              thinkingDuration={thinkingDuration}
+            />
+          )}
+
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeRaw]}
+            components={{
+              code({ className, children, ...props }) {
+                const match = /language-(\w+)/.exec(className || "");
+                const codeText = String(children).replace(/\n$/, "");
+                return match ? (
+                  <div className="relative">
+                    <CopyButton textToCopy={codeText} />
+                    <SyntaxHighlighter
+                      className="custom-scrollbar"
+                      style={vscDarkPlus}
+                      language={match[1]}
+                      PreTag="div"
+                    >
+                      {codeText}
+                    </SyntaxHighlighter>
+                  </div>
+                ) : (
+                  <code className={className} {...props}>
+                    {children}
+                  </code>
+                );
+              },
+            }}
+          >
+            {text}
+          </ReactMarkdown>
+        </>
       </div>
     </div>
   );

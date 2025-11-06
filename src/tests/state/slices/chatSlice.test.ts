@@ -500,6 +500,7 @@ describe("chatSlice", () => {
           text: "",
           isUser: false,
           status: "streaming",
+          thinking: [],
         });
         expect(state.chats[0].lastUpdated).toBe(mockNow);
       });
