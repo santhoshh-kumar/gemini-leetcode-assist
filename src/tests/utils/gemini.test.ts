@@ -338,4 +338,326 @@ describe("callGeminiApi", () => {
     // Should have only 1 content item (the user message)
     expect(callArgs.contents).toHaveLength(1);
   });
+
+  describe("thinking streaming", () => {
+    it("should enable thinking config when streamThoughts is true", async () => {
+      mockGenerateContentStream.mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: "response" }],
+                },
+              },
+            ],
+          };
+        })(),
+      );
+
+      const generator = callGeminiApi(
+        apiKey,
+        modelName,
+        chatHistory,
+        problemDetails,
+        userCode,
+        currentUserMessage,
+        true, // streamThoughts
+      );
+
+      await generator.next();
+
+      const callArgs = mockGenerateContentStream.mock.calls[0][0];
+      expect(callArgs.config.thinkingConfig).toEqual({
+        includeThoughts: true,
+        thinkingBudget: -1,
+      });
+    });
+
+    it("should not include thinking config when streamThoughts is false", async () => {
+      mockGenerateContentStream.mockResolvedValue(
+        (async function* () {
+          yield {
+            candidates: [
+              {
+                content: {
+                  parts: [{ text: "response" }],
+                },
+              },
+            ],
+          };
+        })(),
+      );
+
+      const generator = callGeminiApi(
+        apiKey,
+        modelName,
+        chatHistory,
+        problemDetails,
+        userCode,
+        currentUserMessage,
+        false, // streamThoughts
+      );
+
+      await generator.next();
+
+      const callArgs = mockGenerateContentStream.mock.calls[0][0];
+      expect(callArgs.config.thinkingConfig).toBeUndefined();
+    });
+
+    it("should yield thinking events with start time for first thought", async () => {
+      const mockChunks = [
+        {
+          candidates: [
+            {
+              content: {
+                parts: [{ thought: "First thought", text: "First thought" }],
+              },
+            },
+          ],
+        },
+      ];
+      mockGenerateContentStream.mockResolvedValue(
+        (async function* () {
+          for (const chunk of mockChunks) {
+            yield chunk;
+          }
+        })(),
+      );
+
+      const generator = callGeminiApi(
+        apiKey,
+        modelName,
+        chatHistory,
+        problemDetails,
+        userCode,
+        currentUserMessage,
+        true,
+      );
+
+      const chunks = [];
+      for await (const chunk of generator) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toHaveLength(1);
+      expect(chunks[0]).toHaveProperty("thought", "First thought");
+      expect(chunks[0]).toHaveProperty("thinkingStartTime");
+      expect(typeof chunks[0].thinkingStartTime).toBe("number");
+    });
+
+    it("should yield thinking events without start time for subsequent thoughts", async () => {
+      const mockChunks = [
+        {
+          candidates: [
+            {
+              content: {
+                parts: [{ thought: "First thought", text: "First thought" }],
+              },
+            },
+          ],
+        },
+        {
+          candidates: [
+            {
+              content: {
+                parts: [{ thought: "Second thought", text: "Second thought" }],
+              },
+            },
+          ],
+        },
+      ];
+      mockGenerateContentStream.mockResolvedValue(
+        (async function* () {
+          for (const chunk of mockChunks) {
+            yield chunk;
+          }
+        })(),
+      );
+
+      const generator = callGeminiApi(
+        apiKey,
+        modelName,
+        chatHistory,
+        problemDetails,
+        userCode,
+        currentUserMessage,
+        true,
+      );
+
+      const chunks = [];
+      for await (const chunk of generator) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toHaveLength(2);
+      expect(chunks[0]).toHaveProperty("thought", "First thought");
+      expect(chunks[0]).toHaveProperty("thinkingStartTime");
+      expect(chunks[1]).toHaveProperty("thought", "Second thought");
+      expect(chunks[1]).not.toHaveProperty("thinkingStartTime");
+    });
+
+    it("should yield text with end time when first text chunk arrives after thinking", async () => {
+      const mockChunks = [
+        {
+          candidates: [
+            {
+              content: {
+                parts: [{ thought: "Thinking...", text: "Thinking..." }],
+              },
+            },
+          ],
+        },
+        {
+          candidates: [
+            {
+              content: {
+                parts: [{ text: "Final answer" }],
+              },
+            },
+          ],
+        },
+      ];
+      mockGenerateContentStream.mockResolvedValue(
+        (async function* () {
+          for (const chunk of mockChunks) {
+            yield chunk;
+          }
+        })(),
+      );
+
+      const generator = callGeminiApi(
+        apiKey,
+        modelName,
+        chatHistory,
+        problemDetails,
+        userCode,
+        currentUserMessage,
+        true,
+      );
+
+      const chunks = [];
+      for await (const chunk of generator) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toHaveLength(2);
+      expect(chunks[0]).toHaveProperty("thought", "Thinking...");
+      expect(chunks[0]).toHaveProperty("thinkingStartTime");
+      expect(chunks[1]).toHaveProperty("text", "Final answer");
+      expect(chunks[1]).toHaveProperty("thinkingEndTime");
+      expect(typeof chunks[1].thinkingEndTime).toBe("number");
+    });
+
+    it("should yield text without end time for subsequent text chunks", async () => {
+      const mockChunks = [
+        {
+          candidates: [
+            {
+              content: {
+                parts: [{ thought: "Thinking...", text: "Thinking..." }],
+              },
+            },
+          ],
+        },
+        {
+          candidates: [
+            {
+              content: {
+                parts: [{ text: "First part" }],
+              },
+            },
+          ],
+        },
+        {
+          candidates: [
+            {
+              content: {
+                parts: [{ text: "Second part" }],
+              },
+            },
+          ],
+        },
+      ];
+      mockGenerateContentStream.mockResolvedValue(
+        (async function* () {
+          for (const chunk of mockChunks) {
+            yield chunk;
+          }
+        })(),
+      );
+
+      const generator = callGeminiApi(
+        apiKey,
+        modelName,
+        chatHistory,
+        problemDetails,
+        userCode,
+        currentUserMessage,
+        true,
+      );
+
+      const chunks = [];
+      for await (const chunk of generator) {
+        chunks.push(chunk);
+      }
+
+      expect(chunks).toHaveLength(3);
+      expect(chunks[0]).toHaveProperty("thought", "Thinking...");
+      expect(chunks[1]).toHaveProperty("text", "First part");
+      expect(chunks[1]).toHaveProperty("thinkingEndTime");
+      expect(chunks[2]).toHaveProperty("text", "Second part");
+      expect(chunks[2]).not.toHaveProperty("thinkingEndTime");
+    });
+
+    it("should handle chunks without candidates or content gracefully", async () => {
+      const mockChunks = [
+        {}, // Empty chunk
+        {
+          candidates: [],
+        },
+        {
+          candidates: [
+            {
+              content: {},
+            },
+          ],
+        },
+        {
+          candidates: [
+            {
+              content: {
+                parts: [],
+              },
+            },
+          ],
+        },
+      ];
+      mockGenerateContentStream.mockResolvedValue(
+        (async function* () {
+          for (const chunk of mockChunks) {
+            yield chunk;
+          }
+        })(),
+      );
+
+      const generator = callGeminiApi(
+        apiKey,
+        modelName,
+        chatHistory,
+        problemDetails,
+        userCode,
+        currentUserMessage,
+        true,
+      );
+
+      const chunks = [];
+      for await (const chunk of generator) {
+        chunks.push(chunk);
+      }
+
+      // Should yield no chunks since all are empty
+      expect(chunks).toHaveLength(0);
+    });
+  });
 });

@@ -47,7 +47,8 @@ const ThinkingDropdown: FC<ThinkingDropdownProps> = ({
     // Get first sentence (up to first period, newline, or max 100 chars)
     const match = lastLine.match(/^[^\n.!?]+[.!?]?/);
     const header = match ? match[0].trim() : lastLine.slice(0, 100).trim();
-    return stripMarkdown(header);
+    // Limit to 100 characters
+    return stripMarkdown(header).slice(0, 100);
   };
 
   const lastThoughtHeader = getLastThoughtHeader();

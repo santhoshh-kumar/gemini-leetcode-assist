@@ -236,7 +236,6 @@ const ChatWindow: FC = () => {
         }
 
         if (chunk.thought) {
-          console.log("Dispatched thought:", chunk.thought);
           dispatch(
             updateThinkingState({
               chatId,
