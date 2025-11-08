@@ -2,6 +2,7 @@ import { FC } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import "./ChatMessage.css";
@@ -101,7 +102,7 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
 
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeRaw]}
+            rehypePlugins={[rehypeRaw, rehypeSanitize]}
             components={{
               code({ className, children, ...props }) {
                 const match = /language-(\w+)/.exec(className || "");
