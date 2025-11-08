@@ -11,7 +11,7 @@ export interface ChatMessage {
   text: string;
   isUser: boolean;
   status: "sending" | "succeeded" | "failed" | "streaming";
-  thinking?: string[] | null;
+  thinking?: string[];
   thinkingStartTime?: number; // Unix timestamp in ms
   thinkingEndTime?: number; // Unix timestamp in ms
 }

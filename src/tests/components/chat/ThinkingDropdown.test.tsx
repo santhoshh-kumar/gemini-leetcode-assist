@@ -8,19 +8,25 @@ describe("ThinkingDropdown", () => {
   });
 
   it("renders nothing when thinking is null", () => {
-    const { container } = render(<ThinkingDropdown thinking={null as unknown as string[]} />);
+    const { container } = render(
+      <ThinkingDropdown thinking={null as unknown as string[]} />,
+    );
     expect(container.firstChild).toBeNull();
   });
 
   it("renders nothing when thinking is not an array", () => {
-    const { container } = render(<ThinkingDropdown thinking={"not an array" as unknown as string[]} />);
+    const { container } = render(
+      <ThinkingDropdown thinking={"not an array" as unknown as string[]} />,
+    );
     expect(container.firstChild).toBeNull();
   });
 
   it("renders collapsed state by default", () => {
     render(<ThinkingDropdown thinking={["First thought", "Second thought"]} />);
     expect(screen.getByText("Second thought")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /expand thinking/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /expand thinking/i }),
+    ).toBeInTheDocument();
     expect(screen.queryByTestId("react-markdown")).not.toBeInTheDocument();
   });
 
@@ -33,12 +39,16 @@ describe("ThinkingDropdown", () => {
 
     // Click to expand
     fireEvent.click(button);
-    expect(screen.getByRole("button", { name: /collapse thinking/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /collapse thinking/i }),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("react-markdown")).toBeInTheDocument();
 
     // Click to collapse
     fireEvent.click(button);
-    expect(screen.getByRole("button", { name: /expand thinking/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /expand thinking/i }),
+    ).toBeInTheDocument();
     expect(screen.queryByTestId("react-markdown")).not.toBeInTheDocument();
   });
 
@@ -48,7 +58,7 @@ describe("ThinkingDropdown", () => {
         thinking={["First thought", "Second thought"]}
         isStreaming={false}
         thinkingDuration={5}
-      />
+      />,
     );
     expect(screen.getByText("Thought for 5s")).toBeInTheDocument();
   });
@@ -59,7 +69,7 @@ describe("ThinkingDropdown", () => {
         thinking={["First thought", "Second thought"]}
         isStreaming={false}
         thinkingDuration={0}
-      />
+      />,
     );
     expect(screen.getByText("Thought for 0s")).toBeInTheDocument();
   });
@@ -69,7 +79,7 @@ describe("ThinkingDropdown", () => {
       <ThinkingDropdown
         thinking={["First thought", "Second thought"]}
         isStreaming={true}
-      />
+      />,
     );
     expect(screen.getByText("Second thought")).toBeInTheDocument();
   });
@@ -79,7 +89,7 @@ describe("ThinkingDropdown", () => {
       <ThinkingDropdown
         thinking={["First thought", "Second thought"]}
         isStreaming={false}
-      />
+      />,
     );
     expect(screen.getByText("Second thought")).toBeInTheDocument();
   });
@@ -90,19 +100,39 @@ describe("ThinkingDropdown", () => {
   });
 
   it("strips markdown from header text", () => {
-    render(
+    const { rerender } = render(
       <ThinkingDropdown
         thinking={["**Bold thought**", "*Italic thought*", "`Code thought`"]}
-      />
+      />,
     );
+    // The header should be the last thought, with markdown stripped.
     expect(screen.getByText("Code thought")).toBeInTheDocument();
+    expect(screen.queryByText("`Code thought`")).not.toBeInTheDocument();
+
+    // Rerender with a different last thought to check bold stripping
+    rerender(
+      <ThinkingDropdown
+        thinking={["*Italic thought*", "`Code thought`", "**Bold thought**"]}
+      />,
+    );
+    expect(screen.getByText("Bold thought")).toBeInTheDocument();
+    expect(screen.queryByText("**Bold thought**")).not.toBeInTheDocument();
+
+    // Rerender with a different last thought to check italic stripping
+    rerender(
+      <ThinkingDropdown
+        thinking={["`Code thought`", "**Bold thought**", "*Italic thought*"]}
+      />,
+    );
+    expect(screen.getByText("Italic thought")).toBeInTheDocument();
+    expect(screen.queryByText("*Italic thought*")).not.toBeInTheDocument();
   });
 
   it("extracts first sentence from last thought", () => {
     render(
       <ThinkingDropdown
         thinking={["First thought", "This is a sentence. This is another."]}
-      />
+      />,
     );
     expect(screen.getByText("This is a sentence.")).toBeInTheDocument();
   });
@@ -132,17 +162,29 @@ describe("ThinkingDropdown", () => {
 
   it("applies correct CSS classes and styles", () => {
     const { container } = render(
-      <ThinkingDropdown thinking={["Test thought"]} />
+      <ThinkingDropdown thinking={["Test thought"]} />,
     );
 
     const dropdown = container.firstChild as HTMLElement;
     expect(dropdown).toHaveClass("mb-4");
 
     const button = screen.getByRole("button");
-    expect(button).toHaveClass("flex", "items-center", "gap-1", "text-left", "group");
+    expect(button).toHaveClass(
+      "flex",
+      "items-center",
+      "gap-1",
+      "text-left",
+      "group",
+    );
 
     fireEvent.click(button);
-    const expandedContent = screen.getByTestId("react-markdown").parentElement?.parentElement;
-    expect(expandedContent).toHaveClass("mt-2", "pl-3", "rounded-sm", "opacity-70");
+    const expandedContent =
+      screen.getByTestId("react-markdown").parentElement?.parentElement;
+    expect(expandedContent).toHaveClass(
+      "mt-2",
+      "pl-3",
+      "rounded-sm",
+      "opacity-70",
+    );
   });
 });

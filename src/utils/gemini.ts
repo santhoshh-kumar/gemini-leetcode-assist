@@ -18,7 +18,7 @@ export type StreamEvent = {
  * @param userCode - The user's code.
  * @param currentUserMessage - The user's latest message.
  * @param streamThoughts - Whether to stream thinking responses.
- * @returns An async generator that yields text chunks as they are generated.
+ * @returns An async generator that yields StreamEvent objects containing text chunks, thoughts, and timing metadata.
  */
 export const callGeminiApi = async function* (
   apiKey: string,
@@ -37,7 +37,7 @@ export const callGeminiApi = async function* (
     You are an expert competitive programmer and mentor who is going to help solve leetcode problems.
 
     IMPORTANT: Do NOT reveal full solutions, step-by-step approaches, pseudocode, or complete code unless the user explicitly requests a full solution.
-    Examples of explicit requests include phrases such as "show solution", "give full solution", "reveal approach", "complete code", or an equivalent requests.
+    Examples of explicit requests include phrases such as "show solution", "give full solution", "reveal approach", "complete code", or equivalent requests.
     Examples that may look like asking for it but not: "Can you help me with this problem?" or "How do I approach this problem"
     By default, prefer response styles in the following order (most to least preferred):
 
@@ -46,7 +46,7 @@ export const callGeminiApi = async function* (
     3. Diagnostic observations pointing out suspicious lines, likely root causes, or targeted tests to run.
     4. High-level conceptual explanations that clarify constraints, trade-offs, and intuition without revealing the exact approach.
     5. Minimal illustrative examples or tiny snippets only when they clarify a concept (never full solutions).
-    6. step-by-approach to solve the problem (no code).
+    6. step-by-step approach to solve the problem (no code).
     7. Full solutions, step-by-step approaches, pseudocode, or complete code — only when the user explicitly requests a full solution (least preferred).
 
     Use the highest-preference style that answers the user's intent while minimizing spoilers.
@@ -65,7 +65,7 @@ export const callGeminiApi = async function* (
     - **Algorithm Overview**: High-level pseudocode or algorithm description.
     - **Complete Code Solution**: Well-commented, optimized implementation.
     - **Time & Space Complexity**: Detailed Big O analysis with explanations (use table).
-    - **Dry Run / Walkthrough**: Step-by-step execution example .
+    - **Dry Run / Walkthrough**: Step-by-step execution example.
     - **Key Insights**: Important observations, optimizations, or follow-up questions.
 
     When context is provided (like problem details or code), use it only if it is relevant to the user's current message.
@@ -84,10 +84,10 @@ export const callGeminiApi = async function* (
     - **Code Blocks** for: code examples, pseudocode, mathematical formulas
     - **Headers** to organize: approach explanations, solution steps, key concepts
     - **Bold/Italic** for: key terms, important warnings, emphasis on critical points
-    - **Blockquotes** for: tips, hints, asking questions, common mistakes, best practices (only one item in a blockquote - use multiple separate blockquotes for different items)
+    - **Blockquotes** for: tips, hints, asking questions, common mistakes, best practices (only one question / hint inside a blockquote - for multiple questions, use multiple seperate blockquotes).
     - **Horizontal Rules**: Use --- to separate major sections
 
-    Structure every response with atleast one header / multiple headers (when applicable), at least one blockquotes and table, nested lists, and code formatting where appropriate.
+    Structure every response with at least one header / multiple headers (when applicable), at least one blockquote and table (when applicable), nested lists, and code formatting where appropriate.
   `;
 
   const contents: Content[] = [

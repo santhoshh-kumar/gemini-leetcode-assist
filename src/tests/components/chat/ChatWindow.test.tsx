@@ -184,7 +184,9 @@ describe("ChatWindow", () => {
   });
 
   it("displays a welcome message with 'this problem' when no problem slug", async () => {
-    const store = mockStore(createMockState({ problem: { currentProblemSlug: null } }));
+    const store = mockStore(
+      createMockState({ problem: { currentProblemSlug: null } }),
+    );
 
     await renderWithStore(store);
 
@@ -916,9 +918,7 @@ describe("ChatWindow", () => {
           chats: [
             {
               id: "chat1",
-              messages: [
-                { id: "1", text: "New message", isUser: false },
-              ],
+              messages: [{ id: "1", text: "New message", isUser: false }],
             },
           ],
           currentChatId: "chat1",
@@ -998,9 +998,7 @@ describe("ChatWindow", () => {
           chats: [
             {
               id: "chat1",
-              messages: [
-                { id: "1", text: "New message", isUser: false },
-              ],
+              messages: [{ id: "1", text: "New message", isUser: false }],
             },
           ],
           currentChatId: "chat1",
