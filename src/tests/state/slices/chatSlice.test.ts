@@ -11,6 +11,9 @@ import chatReducer, {
   finishStreamingMessage,
   failStreamingMessage,
   finishStreamingMessageAndSave,
+  updateThinkingState,
+  setThinkingStartTime,
+  setThinkingEndTime,
   ChatState,
   Chat,
   ChatMessage,
@@ -500,6 +503,7 @@ describe("chatSlice", () => {
           text: "",
           isUser: false,
           status: "streaming",
+          thinking: [],
         });
         expect(state.chats[0].lastUpdated).toBe(mockNow);
       });
@@ -799,6 +803,160 @@ describe("chatSlice", () => {
         expect(rejectedState.chats[0].messages[0].status).toBe("failed");
 
         consoleErrorSpy.mockRestore();
+      });
+    });
+  });
+
+  describe("thinking state actions", () => {
+    const chatId = "chat1";
+    const messageId = "msg1";
+    const initialChatState: ChatState = {
+      ...initialState,
+      chats: [
+        {
+          id: chatId,
+          messages: [
+            {
+              id: messageId,
+              text: "Test message",
+              isUser: false,
+              status: "streaming",
+              thinking: [],
+            },
+          ],
+          lastUpdated: mockNow - 1000,
+        },
+      ],
+      currentChatId: chatId,
+    };
+
+    describe("updateThinkingState", () => {
+      it("should add thought to message thinking array", () => {
+        const action = updateThinkingState({
+          chatId,
+          messageId,
+          thought: "First thought",
+        });
+        const state = chatReducer(initialChatState, action);
+
+        expect(state.chats[0].messages[0].thinking).toEqual(["First thought"]);
+      });
+
+      it("should append multiple thoughts to thinking array", () => {
+        let state = chatReducer(
+          initialChatState,
+          updateThinkingState({
+            chatId,
+            messageId,
+            thought: "First thought",
+          }),
+        );
+
+        state = chatReducer(
+          state,
+          updateThinkingState({
+            chatId,
+            messageId,
+            thought: "Second thought",
+          }),
+        );
+
+        expect(state.chats[0].messages[0].thinking).toEqual([
+          "First thought",
+          "Second thought",
+        ]);
+      });
+
+      it("should initialize thinking array if not exists", () => {
+        const stateWithoutThinking: ChatState = {
+          ...initialState,
+          chats: [
+            {
+              id: chatId,
+              messages: [
+                {
+                  id: messageId,
+                  text: "Test message",
+                  isUser: false,
+                  status: "streaming",
+                  // No thinking field
+                },
+              ],
+              lastUpdated: mockNow - 1000,
+            },
+          ],
+          currentChatId: chatId,
+        };
+
+        const action = updateThinkingState({
+          chatId,
+          messageId,
+          thought: "New thought",
+        });
+        const state = chatReducer(stateWithoutThinking, action);
+
+        expect(state.chats[0].messages[0].thinking).toEqual(["New thought"]);
+      });
+
+      it("should do nothing if chat or message doesn't exist", () => {
+        const action = updateThinkingState({
+          chatId: "nonexistent",
+          messageId,
+          thought: "Thought",
+        });
+        const state = chatReducer(initialChatState, action);
+
+        expect(state).toEqual(initialChatState);
+      });
+    });
+
+    describe("setThinkingStartTime", () => {
+      it("should set thinking start time on message", () => {
+        const startTime = 1234567890123;
+        const action = setThinkingStartTime({
+          chatId,
+          messageId,
+          timestamp: startTime,
+        });
+        const state = chatReducer(initialChatState, action);
+
+        expect(state.chats[0].messages[0].thinkingStartTime).toBe(startTime);
+      });
+
+      it("should do nothing if chat or message doesn't exist", () => {
+        const action = setThinkingStartTime({
+          chatId: "nonexistent",
+          messageId,
+          timestamp: 1234567890123,
+        });
+        const state = chatReducer(initialChatState, action);
+
+        expect(state.chats[0].messages[0].thinkingStartTime).toBeUndefined();
+      });
+    });
+
+    describe("setThinkingEndTime", () => {
+      it("should set thinking end time on message", () => {
+        const endTime = 1234567890123;
+        const action = setThinkingEndTime({
+          chatId,
+          messageId,
+          timestamp: endTime,
+        });
+        const state = chatReducer(initialChatState, action);
+
+        expect(state.chats[0].messages[0].thinkingEndTime).toBe(endTime);
+      });
+
+      it("should do nothing if chat or message doesn't exist", () => {
+        const action = setThinkingEndTime({
+          chatId: "nonexistent",
+          messageId,
+          timestamp: 1234567890123,
+        });
+        const state = chatReducer(initialChatState, action);
+
+        expect(state.chats[0].messages[0].thinkingEndTime).toBeUndefined();
       });
     });
   });

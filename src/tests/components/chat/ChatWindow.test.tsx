@@ -110,7 +110,7 @@ const renderWithStore = async (store: ReturnType<typeof mockStore>) =>
       </Provider>,
     );
     // Wait for any async effects to complete
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => setTimeout(resolve, 100));
     return result;
   });
 
@@ -129,8 +129,8 @@ describe("ChatWindow", () => {
 
     // Mock the streaming API
     mockCallGeminiApi.mockImplementation(async function* () {
-      yield "Bot ";
-      yield "response";
+      yield { text: "Bot " };
+      yield { text: "response" };
     });
 
     // Mock the async actions to return simple action objects
@@ -170,16 +170,38 @@ describe("ChatWindow", () => {
     await renderWithStore(store);
 
     expect(await screen.findByText("Hello, LeetCoder")).toBeInTheDocument();
-    // The welcome text may include the prettified problem title derived from the URL
-    // (the DOM may split text across nodes), so match flexibly by checking both
-    // the helper phrase and the problem title are present in the same element.
-    expect(
-      await screen.findByText(
-        (content) =>
-          content.includes("How can I assist you with") &&
-          content.includes("Two Sum"),
-      ),
-    ).toBeInTheDocument();
+
+    // Find the welcome message container and verify its content
+    const welcomeContainer = await screen
+      .findByText("Hello, LeetCoder")
+      .then(
+        (element) =>
+          element.closest(".flex.flex-col.items-center") as HTMLElement,
+      );
+    expect(welcomeContainer).toBeInTheDocument();
+    expect(welcomeContainer.textContent).toContain("How can I assist you with");
+    expect(welcomeContainer.textContent).toContain("Two Sum");
+  });
+
+  it("displays a welcome message with 'this problem' when no problem slug", async () => {
+    const store = mockStore(
+      createMockState({ problem: { currentProblemSlug: null } }),
+    );
+
+    await renderWithStore(store);
+
+    expect(await screen.findByText("Hello, LeetCoder")).toBeInTheDocument();
+
+    // Find the welcome message container and verify it uses 'this problem'
+    const welcomeContainer = await screen
+      .findByText("Hello, LeetCoder")
+      .then(
+        (element) =>
+          element.closest(".flex.flex-col.items-center") as HTMLElement,
+      );
+    expect(welcomeContainer).toBeInTheDocument();
+    expect(welcomeContainer.textContent).toContain("How can I assist you with");
+    expect(welcomeContainer.textContent).toContain("this problem");
   });
 
   it("displays a welcome message with the problem title", async () => {
@@ -192,9 +214,45 @@ describe("ChatWindow", () => {
     const store = mockStore(createMockState());
     await renderWithStore(store);
 
-    expect(
-      await screen.findByText("How can I assist you with Two Sum problem?"),
-    ).toBeInTheDocument();
+    // Find the welcome message container and verify its content
+    const welcomeContainer = await screen
+      .findByText("Hello, LeetCoder")
+      .then(
+        (element) =>
+          element.closest(".flex.flex-col.items-center") as HTMLElement,
+      );
+    expect(welcomeContainer).toBeInTheDocument();
+    expect(welcomeContainer.textContent).toContain("How can I assist you with");
+    expect(welcomeContainer.textContent).toContain("Two Sum");
+    expect(welcomeContainer.textContent).toContain("problem?");
+  });
+
+  it("displays a welcome message with prettified slug when no title in storage", async () => {
+    (chrome.storage.local.get as jest.Mock).mockResolvedValue({
+      "leetcode-problem-two-sum": {
+        // No title property, should fall back to prettify
+      },
+    });
+
+    const store = mockStore(createMockState());
+    await renderWithStore(store);
+
+    // Wait for the prettified title to appear
+    await waitFor(() => {
+      expect(screen.getByText("Two Sum")).toBeInTheDocument();
+    });
+
+    // Find the welcome message container and verify it uses prettified slug
+    const welcomeContainer = await screen
+      .findByText("Hello, LeetCoder")
+      .then(
+        (element) =>
+          element.closest(".flex.flex-col.items-center") as HTMLElement,
+      );
+    expect(welcomeContainer).toBeInTheDocument();
+    expect(welcomeContainer.textContent).toContain("How can I assist you with");
+    expect(welcomeContainer.textContent).toContain("Two Sum"); // Prettified from "two-sum"
+    expect(welcomeContainer.textContent).toContain("problem?");
   });
 
   it("dispatches loadChats on mount if problem slug exists", async () => {
@@ -590,11 +648,12 @@ describe("ChatWindow", () => {
       },
     });
 
-    // Mock the streaming generator to yield chunks
+    // Mock the streaming generator to yield chunks with thought and text
     mockCallGeminiApi.mockImplementation(async function* () {
-      yield "Response ";
-      yield "chunk ";
-      yield "1";
+      yield { thought: "Thinking about the solution..." };
+      yield { text: "Response " };
+      yield { text: "chunk " };
+      yield { text: "1" };
     });
 
     // Create a mock store that supports thunks by implementing basic dispatch
@@ -609,7 +668,7 @@ describe("ChatWindow", () => {
     const mockStateData = createMockState({
       chat: {
         chats: [{ id: "chat1", messages: [] }],
-        currentChatId: "chat1",
+        currentChatId: null, // Set to null to cover chatId = nanoid()
         selectedContexts: ["Problem Details", "Code"],
       },
     });
@@ -662,6 +721,7 @@ describe("ChatWindow", () => {
       expect.stringContaining("Two Sum"),
       "function solution() {}",
       "Test streaming message",
+      true,
     );
   });
 
@@ -675,7 +735,7 @@ describe("ChatWindow", () => {
 
     // Mock the streaming generator to throw an error
     mockCallGeminiApi.mockImplementation(async function* () {
-      yield ""; // Need at least one yield to make it a valid generator
+      yield { text: "" }; // Need at least one yield to make it a valid generator
       throw new Error("API Error");
     });
 
@@ -732,6 +792,251 @@ describe("ChatWindow", () => {
         type: expect.stringContaining("setError"),
       }),
     );
+  });
+
+  it("should dispatch thinking time actions when stream yields thinking timestamps", async () => {
+    // Mock chrome storage
+    (chrome.storage.local.get as jest.Mock).mockResolvedValue({
+      "leetcode-problem-two-sum": {
+        title: "Two Sum",
+        description: "Problem description",
+        constraints: "constraints",
+        examples: "examples",
+        code: "function solution() {}",
+      },
+    });
+
+    // Mock the streaming generator to yield thinking timestamps
+    mockCallGeminiApi.mockImplementation(async function* () {
+      yield { thinkingStartTime: 1000 };
+      yield { thought: "Intermediate thought" };
+      yield { thinkingEndTime: 2000 };
+      yield { text: "Final response" };
+    });
+
+    const mockDispatch = jest.fn().mockImplementation((action) => {
+      if (typeof action === "function") {
+        return action(mockDispatch, () => mockStateData, undefined);
+      }
+      return action;
+    });
+
+    const mockStateData = createMockState({
+      chat: {
+        chats: [{ id: "chat1", messages: [] }],
+        currentChatId: "chat1",
+        selectedContexts: ["Problem Details", "Code"],
+      },
+    });
+
+    const store = {
+      dispatch: mockDispatch,
+      getState: () => mockStateData,
+      subscribe: jest.fn(),
+      replaceReducer: jest.fn(),
+      [Symbol.observable]: jest.fn(),
+    } as unknown as ReturnType<typeof mockStore>;
+
+    await act(async () => {
+      render(
+        <Provider store={store}>
+          <ChatWindow />
+        </Provider>,
+      );
+      // Wait for async effects
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const input = screen.getByRole("textbox");
+    const sendButton = screen.getByRole("button", { name: /Send/i });
+
+    fireEvent.change(input, { target: { value: "Test thinking timestamps" } });
+    fireEvent.click(sendButton);
+
+    // Wait for async operations
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+
+    // Verify thinking time related actions were dispatched
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: expect.stringContaining("setThinkingStartTime"),
+      }),
+    );
+
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: expect.stringContaining("setThinkingEndTime"),
+      }),
+    );
+  });
+
+  it("uses fallback scroll behavior when messagesEndRef.scrollIntoView is not available", async () => {
+    const initialStore = mockStore(
+      createMockState({
+        chat: {
+          chats: [{ id: "chat1", messages: [] }],
+          currentChatId: "chat1",
+        },
+      }),
+    );
+
+    // Render initially
+    const { rerender } = await act(async () => {
+      return render(
+        <Provider store={initialStore}>
+          <ChatWindow />
+        </Provider>,
+      );
+    });
+
+    // Find the messages container and the end div
+    const container = document.querySelector(
+      ".flex-grow.p-4.overflow-y-auto",
+    ) as HTMLElement | null;
+    const messagesEndDiv = container?.querySelector("div:last-child");
+
+    expect(container).toBeInTheDocument();
+    expect(messagesEndDiv).toBeInTheDocument();
+
+    // Remove scrollIntoView to force fallback path
+    // @ts-expect-error - remove scrollIntoView to force fallback path
+    delete (messagesEndDiv as HTMLElement).scrollIntoView;
+
+    // Define scrollHeight on the container and reset scrollTop
+    Object.defineProperty(container as HTMLElement, "scrollHeight", {
+      value: 500,
+      configurable: true,
+    });
+    (container as HTMLElement & { scrollTop: number }).scrollTop = 0;
+
+    // Rerender with a new message to trigger scrollToBottom fallback
+    const storeWithMessages = mockStore(
+      createMockState({
+        chat: {
+          chats: [
+            {
+              id: "chat1",
+              messages: [{ id: "1", text: "New message", isUser: false }],
+            },
+          ],
+          currentChatId: "chat1",
+        },
+      }),
+    );
+
+    await act(async () => {
+      rerender(
+        <Provider store={storeWithMessages}>
+          <ChatWindow />
+        </Provider>,
+      );
+      // allow effects to run
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    // The fallback should have set scrollTop to scrollHeight
+    expect((container as HTMLElement & { scrollTop: number }).scrollTop).toBe(
+      (container as HTMLElement & { scrollHeight: number }).scrollHeight,
+    );
+  });
+
+  it("does not auto-scroll when the user has scrolled up (handleScroll sets autoScrollEnabledRef to false)", async () => {
+    const initialStore = mockStore(
+      createMockState({
+        chat: {
+          chats: [{ id: "chat1", messages: [] }],
+          currentChatId: "chat1",
+        },
+      }),
+    );
+
+    const { rerender } = await act(async () => {
+      return render(
+        <Provider store={initialStore}>
+          <ChatWindow />
+        </Provider>,
+      );
+    });
+
+    // Find the messages container and the end div
+    const container = document.querySelector(
+      ".flex-grow.p-4.overflow-y-auto",
+    ) as HTMLElement | null;
+    const messagesEndDiv = container?.querySelector("div:last-child");
+
+    expect(container).toBeInTheDocument();
+    expect(messagesEndDiv).toBeInTheDocument();
+
+    // Ensure scrollIntoView exists and spy on it
+    const spy = jest.fn();
+    Object.defineProperty(messagesEndDiv as HTMLElement, "scrollIntoView", {
+      value: spy,
+      writable: true,
+    });
+
+    // Simulate that user scrolled up: distanceFromBottom > SCROLL_THRESHOLD
+    Object.defineProperty(container as HTMLElement, "scrollHeight", {
+      value: 1000,
+      configurable: true,
+    });
+    Object.defineProperty(container as HTMLElement, "clientHeight", {
+      value: 400,
+      configurable: true,
+    });
+    (container as HTMLElement & { scrollTop: number }).scrollTop = 100;
+
+    // Trigger scroll event to call handleScroll
+    container?.dispatchEvent(new Event("scroll"));
+
+    // Rerender with a new message; since auto-scroll should be disabled,
+    // scrollIntoView should NOT be called.
+    const storeWithMessages = mockStore(
+      createMockState({
+        chat: {
+          chats: [
+            {
+              id: "chat1",
+              messages: [{ id: "1", text: "New message", isUser: false }],
+            },
+          ],
+          currentChatId: "chat1",
+        },
+      }),
+    );
+
+    await act(async () => {
+      rerender(
+        <Provider store={storeWithMessages}>
+          <ChatWindow />
+        </Provider>,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("renders minimized header only when chat is minimized", async () => {
+    const store = mockStore(
+      createMockState({
+        ui: {
+          isChatOpen: true,
+          isChatMinimized: true,
+          chatPosition: { x: 50, y: 50 },
+          chatSize: { width: 400, height: 600 },
+        },
+      }),
+    );
+
+    await renderWithStore(store);
+
+    // When minimized, the header should still be visible but message area should not
+    expect(screen.getByText("Gemini Assistant")).toBeInTheDocument();
+    // The welcome text or input should NOT be visible when minimized
+    expect(screen.queryByText("Hello, LeetCoder")).toBeNull();
+    expect(screen.queryByRole("textbox")).toBeNull();
   });
 
   it("should handle scrollToBottom when ref is null", async () => {
