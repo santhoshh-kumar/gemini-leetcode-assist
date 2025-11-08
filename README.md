@@ -54,6 +54,15 @@ npm run build
 
 This will create a `dist` directory with the production-ready extension files.
 
+### Running the Build in Browser (Developer Mode)
+
+1. Open your browser’s **Extensions** page.  
+2. Enable **Developer mode** (toggle found on the extensions page).  
+3. Click **Load unpacked** (or **Load unpacked extension**).  
+4. Select the generated **`dist/`** folder.  
+5. Confirm the extension appears in the extensions list and is **enabled**.  
+6. After making changes and running **`npm run build`** again, click **Reload** for the extension on the extensions page to apply the updated **`dist/`** files.
+
 ### Testing
 
 #### Unit Tests
