@@ -197,7 +197,7 @@ const ChatWindow: FC = () => {
         startStreamingMessage({
           chatId,
           messageId: assistantMessageId,
-          text: "",
+          text: "Processing your request...",
         }),
       );
 

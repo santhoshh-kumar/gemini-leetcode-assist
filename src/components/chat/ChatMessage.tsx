@@ -87,6 +87,7 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
 
   const hasThinking = thinking && thinking.length > 0;
   const isStreaming = status === "streaming";
+  const isProcessing = text === "Processing your request..." && isStreaming;
 
   return (
     <div className="flex justify-start mb-4 bot-message">
@@ -100,35 +101,39 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
             />
           )}
 
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeRaw, rehypeSanitize]}
-            components={{
-              code({ className, children, ...props }) {
-                const match = /language-(\w+)/.exec(className || "");
-                const codeText = String(children).replace(/\n$/, "");
-                return match ? (
-                  <div className="relative">
-                    <CopyButton textToCopy={codeText} />
-                    <SyntaxHighlighter
-                      className="custom-scrollbar"
-                      style={vscDarkPlus}
-                      language={match[1]}
-                      PreTag="div"
-                    >
-                      {codeText}
-                    </SyntaxHighlighter>
-                  </div>
-                ) : (
-                  <code className={className} {...props}>
-                    {children}
-                  </code>
-                );
-              },
-            }}
-          >
-            {text}
-          </ReactMarkdown>
+          {isProcessing ? (
+            <span className="shimmer">{text}</span>
+          ) : (
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeRaw, rehypeSanitize]}
+              components={{
+                code({ className, children, ...props }) {
+                  const match = /language-(\w+)/.exec(className || "");
+                  const codeText = String(children).replace(/\n$/, "");
+                  return match ? (
+                    <div className="relative">
+                      <CopyButton textToCopy={codeText} />
+                      <SyntaxHighlighter
+                        className="custom-scrollbar"
+                        style={vscDarkPlus}
+                        language={match[1]}
+                        PreTag="div"
+                      >
+                        {codeText}
+                      </SyntaxHighlighter>
+                    </div>
+                  ) : (
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  );
+                },
+              }}
+            >
+              {text}
+            </ReactMarkdown>
+          )}
         </>
       </div>
     </div>

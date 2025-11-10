@@ -205,6 +205,10 @@ const chatSlice = createSlice({
             message.thinking = [];
           }
           message.thinking.push(thought);
+          // Clear processing text when first thought arrives
+          if (message.text === "Processing your request...") {
+            message.text = "";
+          }
         }
       }
     },
@@ -242,7 +246,11 @@ const chatSlice = createSlice({
       if (chat) {
         const message = chat.messages.find((m) => m.id === messageId);
         if (message && message.status === "streaming") {
-          message.text += textChunk;
+          if (message.text === "Processing your request...") {
+            message.text = textChunk;
+          } else {
+            message.text += textChunk;
+          }
         }
       }
     },
