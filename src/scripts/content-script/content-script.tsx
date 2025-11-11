@@ -1,5 +1,5 @@
 import "@/index.css";
-import { parseLeetCodeProblem } from "./parser";
+import { parseLeetCodeProblem, parseLeetCodetestResult } from "./parser";
 import store from "@/state/store";
 import { toggleChat } from "@/state/slices/uiSlice";
 import { createRoot } from "react-dom/client";
@@ -10,10 +10,13 @@ import { setProblemSlug } from "@/state/slices/problemSlice";
 let problemDetails: Awaited<ReturnType<typeof parseLeetCodeProblem>> | null =
   null;
 let lastSentCode: string | null = null;
+let lasttestResult: Awaited<
+  ReturnType<typeof parseLeetCodetestResult>
+> | null = null;
 
 // --- Function to send combined data to background ---
 function sendUnifiedUpdate(code: string) {
-  if (!problemDetails || code === lastSentCode) {
+  if (!problemDetails) {
     return;
   }
 
@@ -22,10 +25,16 @@ function sendUnifiedUpdate(code: string) {
     return;
   }
 
+  if (code === lastSentCode) {
+    return; // Don't send duplicate updates for the same code
+  }
+
   const payload = {
     ...problemDetails,
     code,
     timestamp: new Date().toISOString(),
+    // include latest parsed Test Result (may be null)
+    testResult: lasttestResult,
   };
 
   chrome.runtime.sendMessage({
@@ -83,6 +92,7 @@ function handleProblemChange() {
         if (details.title !== problemDetails?.title) {
           store.dispatch(setProblemSlug(problemSlug));
           problemDetails = details;
+          lasttestResult = null;
 
           // If we have already received code, send the first unified update
           if (lastSentCode !== null) {
@@ -132,6 +142,49 @@ const observer = new MutationObserver(() => {
 observer.observe(document.body, {
   childList: true,
   subtree: true,
+});
+
+// --- Function to monitor for Test Result after run ---
+function monitortestResult() {
+  let checkCount = 0;
+  const maxChecks = 40; // 20 seconds at 500ms intervals
+  const checkInterval = setInterval(() => {
+    const resultDiv = document.querySelector('div[data-e2e-locator="console-result"]');
+    if (resultDiv && (resultDiv.textContent?.includes('Wrong Answer') || resultDiv.textContent?.includes('Accepted'))) {
+      // Found result, parse Test Result
+      const testResultContainer = resultDiv.closest('.flex-1.overflow-y-auto');
+      if (testResultContainer) {
+        parseLeetCodetestResult(testResultContainer)
+          .then((results) => {
+            if (JSON.stringify(results) !== JSON.stringify(lasttestResult)) {
+              lasttestResult = results;
+              if (lastSentCode) {
+                sendUnifiedUpdate(lastSentCode);
+              }
+            }
+          })
+          .catch((error) => console.error('Failed to parse Test Result:', error));
+      }
+      clearInterval(checkInterval);
+    }
+    checkCount++;
+    if (checkCount >= maxChecks) {
+      clearInterval(checkInterval);
+    }
+  }, 500);
+}
+
+// --- Listen for Run button clicks ---
+const runButton = document.querySelector('button[data-e2e-locator="console-run-button"]');
+if (runButton) {
+  runButton.addEventListener('click', monitortestResult);
+}
+
+// --- Listen for Ctrl + ' keypress ---
+document.addEventListener('keydown', (event) => {
+  if (event.ctrlKey && event.key === "'") {
+    monitortestResult();
+  }
 });
 
 // 5. Listen for messages from the popup

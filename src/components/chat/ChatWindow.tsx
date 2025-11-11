@@ -46,6 +46,7 @@ const ChatWindow: FC = () => {
     chatPosition,
     chatSize,
     isChatHistoryOpen,
+    isContextOpen,
   } = useSelector((state: RootState) => state.ui);
   const { chats, currentChatId, selectedContexts } = useSelector(
     (state: RootState) => state.chat,
@@ -69,6 +70,7 @@ const ChatWindow: FC = () => {
   }, [currentProblemSlug, dispatch]);
 
   const [problemTitle, setProblemTitle] = useState<string | null>(null);
+  const [hastestResult, setHastestResult] = useState(false);
 
   const scrollToBottom = () => {
     if (
@@ -99,6 +101,9 @@ const ChatWindow: FC = () => {
           const key = `leetcode-problem-${currentProblemSlug}`;
           const result = await chrome.storage.local.get(key);
           const problemData = result && result[key];
+          if (problemData) {
+            setHastestResult(!!problemData.testResult);
+          }
           if (problemData && problemData.title) {
             // Remove leading numbering like "1. " or "12. " from titles
             const cleaned = String(problemData.title)
@@ -129,6 +134,17 @@ const ChatWindow: FC = () => {
 
     loadProblemTitle();
   }, [currentProblemSlug]);
+
+  // Update hastestResult when context menu opens
+  useEffect(() => {
+    if (isContextOpen && currentProblemSlug) {
+      const key = `leetcode-problem-${currentProblemSlug}`;
+      chrome.storage.local.get(key).then((result) => {
+        const problemData = result[key];
+        setHastestResult(!!(problemData && problemData.testResult));
+      });
+    }
+  }, [isContextOpen, currentProblemSlug]);
 
   const handleNewChat = () => {
     dispatch(newChat());
@@ -166,6 +182,7 @@ const ChatWindow: FC = () => {
     try {
       let problemDetails: string | null = null;
       let userCode: string | null = null;
+      let testResult: string | null = null;
 
       if (selectedContexts.length > 0 && currentProblemSlug) {
         const key = `leetcode-problem-${currentProblemSlug}`;
@@ -183,6 +200,9 @@ const ChatWindow: FC = () => {
           }
           if (selectedContexts.includes("Code")) {
             userCode = problemData.code;
+          }
+          if (selectedContexts.includes("Test Result")) {
+            testResult = problemData.testResult ? JSON.stringify(problemData.testResult) : null;
           }
         }
       }
@@ -208,6 +228,7 @@ const ChatWindow: FC = () => {
         chatHistory,
         problemDetails,
         userCode,
+        testResult,
         text,
         true, // streamThoughts
       );
@@ -443,7 +464,7 @@ const ChatWindow: FC = () => {
                 </div>
                 <div className="p-2">
                   {apiKey ? (
-                    <MessageInput onSendMessage={handleSendMessage} />
+                    <MessageInput onSendMessage={handleSendMessage} hastestResult={hastestResult} />
                   ) : (
                     <div className="text-center text-xs text-white/60 p-2">
                       Please set your Gemini API key in the extension settings.

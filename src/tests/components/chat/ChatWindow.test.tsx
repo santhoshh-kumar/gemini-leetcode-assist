@@ -720,6 +720,7 @@ describe("ChatWindow", () => {
       [],
       expect.stringContaining("Two Sum"),
       "function solution() {}",
+      null,
       "Test streaming message",
       true,
     );
