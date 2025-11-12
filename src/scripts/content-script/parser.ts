@@ -1,7 +1,7 @@
 interface TestCase {
   input: Record<string, unknown>;
   output: string;
-  expected: string;
+  expected: string | null;
 }
 
 export async function parseLeetCodeProblem() {
@@ -51,7 +51,90 @@ export async function parseLeetCodetestResult(
     container || document.querySelector(".flex-1.overflow-y-auto");
   if (!testResultContainer) return [];
 
-  // Find all headers for Input, Output, Expected
+  // Check for compile error case
+  let resultDiv: Element | null = null;
+
+  // If container is document.body, we're handling a compile error or runtime error
+  if (container === document.body) {
+    resultDiv = document.querySelector('[data-e2e-locator="console-result"]');
+    if (resultDiv && resultDiv.textContent?.includes("Compile Error")) {
+      // Extract compile error details
+      const errorElement = document.querySelector(
+        ".font-menlo.whitespace-pre-wrap.break-all.text-xs.text-red-60.dark\\:text-red-60",
+      );
+      const errorDetails =
+        errorElement?.textContent?.trim() || "Unknown compile error";
+      return [
+        {
+          input: { "NA (compile error)": "NA (compile error)" },
+          output: `Compile Error: ${errorDetails}`,
+          expected: "NA (compile error)",
+        },
+      ];
+    } else if (resultDiv && resultDiv.textContent?.includes("Runtime Error")) {
+      // Extract runtime error details
+      const errorElement = document.querySelector(
+        ".font-menlo.whitespace-pre-wrap.break-all.text-xs.text-red-60.dark\\:text-red-60",
+      );
+      const errorDetails =
+        errorElement?.textContent?.trim() || "Unknown runtime error";
+
+      // Extract input from "Last Executed Input" section
+      const input: Record<string, unknown> = {};
+      const inputGroups = document.querySelectorAll(
+        ".group.relative.rounded-lg.bg-fill-4.dark\\:bg-dark-fill-4",
+      );
+      inputGroups.forEach((group) => {
+        const labelDiv = group.querySelector(
+          ".mx-3.mb-2.text-xs.text-label-3.dark\\:text-dark-label-3",
+        );
+        const valueDiv = group.querySelector(
+          ".font-menlo.mx-3.whitespace-pre-wrap.break-all.leading-5.text-label-1.dark\\:text-dark-label-1",
+        );
+        if (labelDiv && valueDiv) {
+          const key = labelDiv.textContent?.replace("=", "").trim();
+          const valueStr = valueDiv.textContent?.trim();
+          if (key && valueStr) {
+            try {
+              input[key] = JSON.parse(valueStr);
+            } catch {
+              input[key] = valueStr;
+            }
+          }
+        }
+      });
+
+      return [
+        {
+          input,
+          output: `Runtime Error: ${errorDetails}`,
+          expected: null,
+        },
+      ];
+    }
+  } else {
+    // Normal case - look for result div within container
+    resultDiv = testResultContainer.querySelector(
+      '[data-e2e-locator="console-result"]',
+    );
+    if (resultDiv && resultDiv.textContent?.includes("Compile Error")) {
+      // Extract compile error details
+      const errorElement = testResultContainer.querySelector(
+        ".font-menlo.whitespace-pre-wrap.break-all.text-xs.text-red-60.dark\\:text-red-60",
+      );
+      const errorDetails =
+        errorElement?.textContent?.trim() || "Unknown compile error";
+      return [
+        {
+          input: { "NA (compile error)": "NA (compile error)" },
+          output: `Compile Error: ${errorDetails}`,
+          expected: "NA (compile error)",
+        },
+      ];
+    }
+  }
+
+  // Continue with normal test case parsing...
   const allDivs = Array.from(
     testResultContainer.querySelectorAll(
       "div.mb-2, div.text-sd-muted-foreground, div.flex.text-xs",

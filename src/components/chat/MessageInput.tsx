@@ -12,7 +12,10 @@ interface MessageInputProps {
   hastestResult?: boolean;
 }
 
-const MessageInput: FC<MessageInputProps> = ({ onSendMessage, hastestResult = false }) => {
+const MessageInput: FC<MessageInputProps> = ({
+  onSendMessage,
+  hastestResult = false,
+}) => {
   const [message, setMessage] = useState("");
   const dispatch = useDispatch();
 
@@ -149,7 +152,7 @@ const MessageInput: FC<MessageInputProps> = ({ onSendMessage, hastestResult = fa
               </button>
               <button
                 onClick={() => handleAddContext("Test Result")}
-                className={`block w-full text-left px-3 py-1 text-sm ${hastestResult ? 'text-white/80 hover:bg-gray-700' : 'text-white/40 cursor-not-allowed'}`}
+                className={`block w-full text-left px-3 py-1 text-sm ${hastestResult ? "text-white/80 hover:bg-gray-700" : "text-white/40 cursor-not-allowed"}`}
                 disabled={!hastestResult}
                 title={hastestResult ? undefined : "Please run the code first"}
               >

@@ -10,7 +10,9 @@ import { setProblemSlug } from "@/state/slices/problemSlice";
 let problemDetails: Awaited<ReturnType<typeof parseLeetCodeProblem>> | null =
   null;
 let lastSentCode: string | null = null;
-let lasttestResult: Awaited<
+let lasttestResult: Awaited<ReturnType<typeof parseLeetCodetestResult>> | null =
+  null;
+let lastSentTestResult: Awaited<
   ReturnType<typeof parseLeetCodetestResult>
 > | null = null;
 
@@ -25,8 +27,12 @@ function sendUnifiedUpdate(code: string) {
     return;
   }
 
-  if (code === lastSentCode) {
-    return; // Don't send duplicate updates for the same code
+  const codeChanged = code !== lastSentCode;
+  const testResultChanged =
+    JSON.stringify(lasttestResult) !== JSON.stringify(lastSentTestResult);
+
+  if (!codeChanged && !testResultChanged) {
+    return; // Don't send duplicate updates
   }
 
   const payload = {
@@ -46,6 +52,7 @@ function sendUnifiedUpdate(code: string) {
   });
 
   lastSentCode = code; // Remember the last code we sent
+  lastSentTestResult = lasttestResult; // Remember the last testResult we sent
 }
 
 // 1. Inject the script for live code capture
@@ -93,6 +100,7 @@ function handleProblemChange() {
           store.dispatch(setProblemSlug(problemSlug));
           problemDetails = details;
           lasttestResult = null;
+          lastSentTestResult = null;
 
           // If we have already received code, send the first unified update
           if (lastSentCode !== null) {
@@ -149,10 +157,28 @@ function monitortestResult() {
   let checkCount = 0;
   const maxChecks = 40; // 20 seconds at 500ms intervals
   const checkInterval = setInterval(() => {
-    const resultDiv = document.querySelector('div[data-e2e-locator="console-result"]');
-    if (resultDiv && (resultDiv.textContent?.includes('Wrong Answer') || resultDiv.textContent?.includes('Accepted'))) {
+    const resultDiv = document.querySelector(
+      '[data-e2e-locator="console-result"]',
+    );
+    if (
+      resultDiv &&
+      (resultDiv.textContent?.includes("Wrong Answer") ||
+        resultDiv.textContent?.includes("Accepted") ||
+        resultDiv.textContent?.includes("Compile Error") ||
+        resultDiv.textContent?.includes("Runtime Error"))
+    ) {
       // Found result, parse Test Result
-      const testResultContainer = resultDiv.closest('.flex-1.overflow-y-auto');
+      let testResultContainer = resultDiv.closest(".flex-1.overflow-y-auto");
+
+      // For compile errors and runtime errors, the DOM structure is different
+      if (
+        !testResultContainer &&
+        (resultDiv.textContent?.includes("Compile Error") ||
+          resultDiv.textContent?.includes("Runtime Error"))
+      ) {
+        testResultContainer = document.body; // Use document body for error parsing
+      }
+
       if (testResultContainer) {
         parseLeetCodetestResult(testResultContainer)
           .then((results) => {
@@ -163,7 +189,9 @@ function monitortestResult() {
               }
             }
           })
-          .catch((error) => console.error('Failed to parse Test Result:', error));
+          .catch((error) =>
+            console.error("Failed to parse Test Result:", error),
+          );
       }
       clearInterval(checkInterval);
     }
@@ -175,13 +203,15 @@ function monitortestResult() {
 }
 
 // --- Listen for Run button clicks ---
-const runButton = document.querySelector('button[data-e2e-locator="console-run-button"]');
+const runButton = document.querySelector(
+  'button[data-e2e-locator="console-run-button"]',
+);
 if (runButton) {
-  runButton.addEventListener('click', monitortestResult);
+  runButton.addEventListener("click", monitortestResult);
 }
 
 // --- Listen for Ctrl + ' keypress ---
-document.addEventListener('keydown', (event) => {
+document.addEventListener("keydown", (event) => {
   if (event.ctrlKey && event.key === "'") {
     monitortestResult();
   }

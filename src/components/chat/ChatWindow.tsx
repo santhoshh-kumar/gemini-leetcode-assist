@@ -99,8 +99,10 @@ const ChatWindow: FC = () => {
       try {
         if (currentProblemSlug) {
           const key = `leetcode-problem-${currentProblemSlug}`;
+
           const result = await chrome.storage.local.get(key);
           const problemData = result && result[key];
+
           if (problemData) {
             setHastestResult(!!problemData.testResult);
           }
@@ -141,7 +143,8 @@ const ChatWindow: FC = () => {
       const key = `leetcode-problem-${currentProblemSlug}`;
       chrome.storage.local.get(key).then((result) => {
         const problemData = result[key];
-        setHastestResult(!!(problemData && problemData.testResult));
+        const hasResult = !!(problemData && problemData.testResult);
+        setHastestResult(hasResult);
       });
     }
   }, [isContextOpen, currentProblemSlug]);
@@ -202,7 +205,9 @@ const ChatWindow: FC = () => {
             userCode = problemData.code;
           }
           if (selectedContexts.includes("Test Result")) {
-            testResult = problemData.testResult ? JSON.stringify(problemData.testResult) : null;
+            testResult = problemData.testResult
+              ? JSON.stringify(problemData.testResult)
+              : null;
           }
         }
       }
@@ -464,7 +469,10 @@ const ChatWindow: FC = () => {
                 </div>
                 <div className="p-2">
                   {apiKey ? (
-                    <MessageInput onSendMessage={handleSendMessage} hastestResult={hastestResult} />
+                    <MessageInput
+                      onSendMessage={handleSendMessage}
+                      hastestResult={hastestResult}
+                    />
                   ) : (
                     <div className="text-center text-xs text-white/60 p-2">
                       Please set your Gemini API key in the extension settings.
