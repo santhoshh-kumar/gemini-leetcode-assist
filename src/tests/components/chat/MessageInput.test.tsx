@@ -6,6 +6,7 @@ import { thunk } from "redux-thunk";
 import { addContext, removeContext } from "@/state/slices/chatSlice";
 import { setSelectedModel } from "@/state/slices/settingsSlice";
 import { setContextOpen, setModelMenuOpen } from "@/state/slices/uiSlice";
+import { DEFAULT_MODEL } from "@/utils/models";
 
 const mockStore = configureStore([thunk]);
 
@@ -19,7 +20,7 @@ const createMockState = (overrides = {}) => ({
     isModelMenuOpen: false,
   },
   settings: {
-    selectedModel: "gemini-2.5-pro",
+    selectedModel: DEFAULT_MODEL,
   },
   ...overrides,
 });

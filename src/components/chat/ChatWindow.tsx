@@ -29,6 +29,15 @@ import { nanoid } from "@reduxjs/toolkit";
 import { setError, clearError } from "@/state/slices/apiSlice";
 import { callGeminiApi } from "@/utils/gemini";
 import { loadApiKey } from "@/state/slices/settingsSlice";
+import { PROCESSING_MESSAGE } from "@/constants/chat";
+import {
+  GEMINI_ASSISTANT_TITLE,
+  WELCOME_GREETING,
+  ASSISTANCE_PREFIX,
+  PROBLEM_SUFFIX,
+  THIS_PROBLEM,
+  API_KEY_MESSAGE,
+} from "@/constants/ui";
 import { X, Bot, Maximize2, Plus, History, Minimize2 } from "lucide-react";
 
 const ChatWindow: FC = () => {
@@ -197,7 +206,7 @@ const ChatWindow: FC = () => {
         startStreamingMessage({
           chatId,
           messageId: assistantMessageId,
-          text: "Processing your request...",
+          text: PROCESSING_MESSAGE,
         }),
       );
 
@@ -348,7 +357,7 @@ const ChatWindow: FC = () => {
               <div className="flex items-center gap-2">
                 <Bot size={18} className="text-white/80" />
                 <span className="text-sm font-medium text-white/90">
-                  Gemini Assistant
+                  {GEMINI_ASSISTANT_TITLE}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -402,20 +411,22 @@ const ChatWindow: FC = () => {
                   {messages.length === 0 && !isLoading ? (
                     <div className="flex flex-col items-center justify-center h-full text-center text-white">
                       <h2 className="text-xl">
-                        <span className="user-greeting">Hello, LeetCoder</span>
+                        <span className="user-greeting">
+                          {WELCOME_GREETING}
+                        </span>
                       </h2>
                       <h1>
                         <span className="text-white/70">
-                          How can I assist you with{" "}
+                          {ASSISTANCE_PREFIX}{" "}
                           {problemTitle ? (
                             <>
                               <strong className="text-white/75">
                                 {problemTitle}
                               </strong>{" "}
-                              problem
+                              {PROBLEM_SUFFIX}
                             </>
                           ) : (
-                            "this problem"
+                            THIS_PROBLEM
                           )}
                           ?
                         </span>
@@ -446,7 +457,7 @@ const ChatWindow: FC = () => {
                     <MessageInput onSendMessage={handleSendMessage} />
                   ) : (
                     <div className="text-center text-xs text-white/60 p-2">
-                      Please set your Gemini API key in the extension settings.
+                      {API_KEY_MESSAGE}
                     </div>
                   )}
                 </div>

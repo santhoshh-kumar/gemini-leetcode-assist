@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction, createAsyncThunk } from "@reduxjs/toolkit";
+import { DEFAULT_MODEL } from "@/utils/models";
 
 // Thunk to load the API key from chrome.storage
 export const loadApiKey = createAsyncThunk(
@@ -27,7 +28,7 @@ export interface SettingsState {
 
 const initialState: SettingsState = {
   apiKey: null,
-  selectedModel: "gemini-2.5-pro",
+  selectedModel: DEFAULT_MODEL,
 };
 
 const settingsSlice = createSlice({

@@ -5,6 +5,7 @@ import {
   createAsyncThunk,
 } from "@reduxjs/toolkit";
 import { saveChat, loadChats as loadChatsFromDB } from "@/utils/db";
+import { PROCESSING_MESSAGE } from "@/constants/chat";
 
 export interface ChatMessage {
   id: string;
@@ -206,7 +207,7 @@ const chatSlice = createSlice({
           }
           message.thinking.push(thought);
           // Clear processing text when first thought arrives
-          if (message.text === "Processing your request...") {
+          if (message.text === PROCESSING_MESSAGE) {
             message.text = "";
           }
         }
@@ -246,7 +247,7 @@ const chatSlice = createSlice({
       if (chat) {
         const message = chat.messages.find((m) => m.id === messageId);
         if (message && message.status === "streaming") {
-          if (message.text === "Processing your request...") {
+          if (message.text === PROCESSING_MESSAGE) {
             message.text = textChunk;
           } else {
             message.text += textChunk;
