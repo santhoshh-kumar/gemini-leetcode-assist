@@ -1,7 +1,22 @@
 export interface TestCase {
-  input: Record<string, unknown>;
+  input: Record<string, unknown> | null;
   output: string;
   expected: string | null;
+}
+
+function parseCompileError(searchContainer: Element | Document): TestCase[] {
+  const errorElement = searchContainer.querySelector(
+    ".font-menlo.whitespace-pre-wrap.break-all.text-xs.text-red-60.dark\\:text-red-60",
+  );
+  const errorDetails =
+    errorElement?.textContent?.trim() || "Unknown compile error";
+  return [
+    {
+      input: null,
+      output: `Compile Error: ${errorDetails}`,
+      expected: null,
+    },
+  ];
 }
 
 export async function parseLeetCodeProblem() {
@@ -24,6 +39,15 @@ export async function parseLeetCodeProblem() {
   const examples = Array.from(contentNode?.querySelectorAll("pre") || []).map(
     (pre) => pre.textContent?.trim() || "",
   );
+
+  // If no pre tags, try example-block divs
+  if (examples.length === 0) {
+    examples.push(
+      ...Array.from(contentNode?.querySelectorAll(".example-block") || []).map(
+        (block) => block.textContent?.trim() || "",
+      ),
+    );
+  }
 
   const constraintsHeading = [
     ...(contentNode?.querySelectorAll("strong, b") ?? []),
@@ -58,19 +82,7 @@ export async function parseLeetCodetestResult(
   if (container === document.body) {
     resultDiv = document.querySelector('[data-e2e-locator="console-result"]');
     if (resultDiv && resultDiv.textContent?.includes("Compile Error")) {
-      // Extract compile error details
-      const errorElement = document.querySelector(
-        ".font-menlo.whitespace-pre-wrap.break-all.text-xs.text-red-60.dark\\:text-red-60",
-      );
-      const errorDetails =
-        errorElement?.textContent?.trim() || "Unknown compile error";
-      return [
-        {
-          input: { "NA (compile error)": "NA (compile error)" },
-          output: `Compile Error: ${errorDetails}`,
-          expected: "NA (compile error)",
-        },
-      ];
+      return parseCompileError(document);
     } else if (resultDiv && resultDiv.textContent?.includes("Runtime Error")) {
       // Extract runtime error details
       const errorElement = document.querySelector(
@@ -114,19 +126,7 @@ export async function parseLeetCodetestResult(
       '[data-e2e-locator="console-result"]',
     );
     if (resultDiv && resultDiv.textContent?.includes("Compile Error")) {
-      // Extract compile error details
-      const errorElement = testResultContainer.querySelector(
-        ".font-menlo.whitespace-pre-wrap.break-all.text-xs.text-red-60.dark\\:text-red-60",
-      );
-      const errorDetails =
-        errorElement?.textContent?.trim() || "Unknown compile error";
-      return [
-        {
-          input: { "NA (compile error)": "NA (compile error)" },
-          output: `Compile Error: ${errorDetails}`,
-          expected: "NA (compile error)",
-        },
-      ];
+      return parseCompileError(testResultContainer);
     }
   }
 

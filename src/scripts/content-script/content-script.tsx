@@ -154,7 +154,7 @@ observer.observe(document.body, {
 });
 
 // --- Observe for Run button ---
-const buttonObserver = new MutationObserver(() => {
+function attachRunButtonListener() {
   const runButton = document.querySelector(
     'button[data-e2e-locator="console-run-button"]',
   );
@@ -162,6 +162,10 @@ const buttonObserver = new MutationObserver(() => {
     runButton.setAttribute("data-monitor-attached", "true");
     runButton.addEventListener("click", monitorTestResult);
   }
+}
+
+const buttonObserver = new MutationObserver(() => {
+  attachRunButtonListener();
 });
 
 // Start observing for the run button
@@ -171,16 +175,7 @@ buttonObserver.observe(document.body, {
 });
 
 // Also check for existing button immediately
-const existingRunButton = document.querySelector(
-  'button[data-e2e-locator="console-run-button"]',
-);
-if (
-  existingRunButton &&
-  !existingRunButton.hasAttribute("data-monitor-attached")
-) {
-  existingRunButton.setAttribute("data-monitor-attached", "true");
-  existingRunButton.addEventListener("click", monitorTestResult);
-}
+attachRunButtonListener();
 
 // --- Function to monitor for Test Result after run ---
 function monitorTestResult() {

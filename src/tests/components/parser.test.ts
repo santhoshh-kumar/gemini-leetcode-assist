@@ -134,10 +134,10 @@ describe("parseLeetCodetestResult", () => {
     const result = await parseLeetCodetestResult(document.body);
     expect(result).toEqual([
       {
-        input: { "NA (compile error)": "NA (compile error)" },
+        input: null,
         output:
           "Compile Error: Line 5: Char 12: error: expected ';' before '}' token",
-        expected: "NA (compile error)",
+        expected: null,
       },
     ]);
   });
@@ -185,9 +185,9 @@ describe("parseLeetCodetestResult", () => {
     const result = await parseLeetCodetestResult(container);
     expect(result).toEqual([
       {
-        input: { "NA (compile error)": "NA (compile error)" },
+        input: null,
         output: "Compile Error: Syntax error: unexpected token",
-        expected: "NA (compile error)",
+        expected: null,
       },
     ]);
   });
@@ -518,9 +518,9 @@ describe("parseLeetCodetestResult", () => {
     const result = await parseLeetCodetestResult(document.body);
     expect(result).toEqual([
       {
-        input: { "NA (compile error)": "NA (compile error)" },
+        input: null,
         output: "Compile Error: Unknown compile error",
-        expected: "NA (compile error)",
+        expected: null,
       },
     ]);
   });
