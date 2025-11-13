@@ -11,6 +11,7 @@ import ChatWindow from "@/components/chat/ChatWindow";
 import { toggleChat, toggleMinimize } from "@/state/slices/uiSlice";
 import * as gemini from "@/utils/gemini";
 import { loadChats } from "@/state/slices/chatSlice";
+import { DEFAULT_MODEL } from "@/utils/models";
 
 jest.mock("@/state/slices/chatSlice", () => ({
   ...jest.requireActual("@/state/slices/chatSlice"),
@@ -82,7 +83,7 @@ const createMockState = (overrides: MockStateOverrides = {}) => {
   };
   const defaultSettings = {
     apiKey: "test-api-key",
-    selectedModel: "gemini-2.5-pro",
+    selectedModel: DEFAULT_MODEL,
   };
   const defaultApi = { isLoading: false, error: null };
   const defaultProblem = { currentProblemSlug: "two-sum" };

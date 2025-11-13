@@ -1,4 +1,4 @@
-import { FC } from "react";
+import { FC, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -8,6 +8,38 @@ import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import "./ChatMessage.css";
 import CopyButton from "./CopyButton";
 import ThinkingDropdown from "./ThinkingDropdown";
+import { PROCESSING_MESSAGE } from "@/constants/chat";
+
+const markdownComponents = {
+  code({
+    className,
+    children,
+    ...props
+  }: {
+    className?: string;
+    children?: ReactNode;
+  }) {
+    const match = /language-(\w+)/.exec(className || "");
+    const codeText = String(children).replace(/\n$/, "");
+    return match ? (
+      <div className="relative">
+        <CopyButton textToCopy={codeText} />
+        <SyntaxHighlighter
+          className="custom-scrollbar"
+          style={vscDarkPlus}
+          language={match[1]}
+          PreTag="div"
+        >
+          {codeText}
+        </SyntaxHighlighter>
+      </div>
+    ) : (
+      <code className={className} {...props}>
+        {children}
+      </code>
+    );
+  },
+};
 
 type MessageShape = {
   id?: string;
@@ -87,6 +119,7 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
 
   const hasThinking = thinking && thinking.length > 0;
   const isStreaming = status === "streaming";
+  const isProcessing = text === PROCESSING_MESSAGE && isStreaming;
 
   return (
     <div className="flex justify-start mb-4 bot-message">
@@ -100,35 +133,17 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
             />
           )}
 
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            rehypePlugins={[rehypeRaw, rehypeSanitize]}
-            components={{
-              code({ className, children, ...props }) {
-                const match = /language-(\w+)/.exec(className || "");
-                const codeText = String(children).replace(/\n$/, "");
-                return match ? (
-                  <div className="relative">
-                    <CopyButton textToCopy={codeText} />
-                    <SyntaxHighlighter
-                      className="custom-scrollbar"
-                      style={vscDarkPlus}
-                      language={match[1]}
-                      PreTag="div"
-                    >
-                      {codeText}
-                    </SyntaxHighlighter>
-                  </div>
-                ) : (
-                  <code className={className} {...props}>
-                    {children}
-                  </code>
-                );
-              },
-            }}
-          >
-            {text}
-          </ReactMarkdown>
+          {isProcessing ? (
+            <span className="shimmer">{text}</span>
+          ) : (
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeRaw, rehypeSanitize]}
+              components={markdownComponents}
+            >
+              {text}
+            </ReactMarkdown>
+          )}
         </>
       </div>
     </div>
