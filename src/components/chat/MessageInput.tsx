@@ -9,9 +9,13 @@ import { setContextOpen, setModelMenuOpen } from "@/state/slices/uiSlice.ts";
 
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
+  hasTestResult?: boolean;
 }
 
-const MessageInput: FC<MessageInputProps> = ({ onSendMessage }) => {
+const MessageInput: FC<MessageInputProps> = ({
+  onSendMessage,
+  hasTestResult = false,
+}) => {
   const [message, setMessage] = useState("");
   const dispatch = useDispatch();
 
@@ -145,6 +149,14 @@ const MessageInput: FC<MessageInputProps> = ({ onSendMessage }) => {
                 className="block w-full text-left px-3 py-1 text-sm text-white/80 hover:bg-gray-700"
               >
                 Code
+              </button>
+              <button
+                onClick={() => handleAddContext("Test Result")}
+                className={`block w-full text-left px-3 py-1 text-sm ${hasTestResult ? "text-white/80 hover:bg-gray-700" : "text-white/40 cursor-not-allowed"}`}
+                disabled={!hasTestResult}
+                title={hasTestResult ? undefined : "Please run the code first"}
+              >
+                Test Result
               </button>
             </div>
           )}

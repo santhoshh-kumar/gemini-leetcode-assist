@@ -64,6 +64,7 @@ describe("callGeminiApi", () => {
       chatHistory,
       problemDetails,
       userCode,
+      null,
       currentUserMessage,
       false,
     );
@@ -83,6 +84,7 @@ describe("callGeminiApi", () => {
       chatHistory,
       problemDetails,
       userCode,
+      null,
       currentUserMessage,
       false,
     );
@@ -111,6 +113,7 @@ describe("callGeminiApi", () => {
       chatHistory,
       problemDetails,
       userCode,
+      null,
       currentUserMessage,
       false,
     );
@@ -145,6 +148,7 @@ describe("callGeminiApi", () => {
       apiKey,
       modelName,
       chatHistory,
+      null,
       null,
       null,
       currentUserMessage,
@@ -204,6 +208,7 @@ describe("callGeminiApi", () => {
         chatHistory,
         problemDetails,
         userCode,
+        null,
         currentUserMessage,
         false,
       );
@@ -222,6 +227,7 @@ describe("callGeminiApi", () => {
       chatHistory,
       problemDetails,
       userCode,
+      null,
       currentUserMessage,
       false,
     );
@@ -275,6 +281,7 @@ describe("callGeminiApi", () => {
       chatHistory,
       problemDetails,
       userCode,
+      null,
       currentUserMessage,
       false,
     );
@@ -295,6 +302,7 @@ describe("callGeminiApi", () => {
       chatHistory,
       problemDetails,
       userCode,
+      null,
       currentUserMessage,
       false,
     );
@@ -323,6 +331,7 @@ describe("callGeminiApi", () => {
       [],
       problemDetails,
       userCode,
+      null,
       currentUserMessage,
       false,
     );
@@ -361,6 +370,7 @@ describe("callGeminiApi", () => {
         chatHistory,
         problemDetails,
         userCode,
+        null,
         currentUserMessage,
         true, // streamThoughts
       );
@@ -395,6 +405,7 @@ describe("callGeminiApi", () => {
         chatHistory,
         problemDetails,
         userCode,
+        null,
         currentUserMessage,
         false, // streamThoughts
       );
@@ -431,6 +442,7 @@ describe("callGeminiApi", () => {
         chatHistory,
         problemDetails,
         userCode,
+        null,
         currentUserMessage,
         true,
       );
@@ -481,6 +493,7 @@ describe("callGeminiApi", () => {
         chatHistory,
         problemDetails,
         userCode,
+        null,
         currentUserMessage,
         true,
       );
@@ -532,6 +545,7 @@ describe("callGeminiApi", () => {
         chatHistory,
         problemDetails,
         userCode,
+        null,
         currentUserMessage,
         true,
       );
@@ -593,6 +607,7 @@ describe("callGeminiApi", () => {
         chatHistory,
         problemDetails,
         userCode,
+        null,
         currentUserMessage,
         true,
       );
@@ -647,6 +662,7 @@ describe("callGeminiApi", () => {
         chatHistory,
         problemDetails,
         userCode,
+        null,
         currentUserMessage,
         true,
       );

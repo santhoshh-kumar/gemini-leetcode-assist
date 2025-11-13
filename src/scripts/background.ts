@@ -29,6 +29,3 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
   }
 });
-
-// The chrome.tabs.onRemoved listener has been removed as it is no longer needed.
-// Data is now persisted by problem slug rather than being tied to a tab session.

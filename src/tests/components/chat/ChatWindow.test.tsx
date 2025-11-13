@@ -463,7 +463,7 @@ describe("ChatWindow", () => {
     });
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      "Error loading problem title:",
+      "Error loading problem data:",
       expect.any(Error),
     );
 
@@ -720,6 +720,7 @@ describe("ChatWindow", () => {
       [],
       expect.stringContaining("Two Sum"),
       "function solution() {}",
+      null,
       "Test streaming message",
       true,
     );
@@ -1056,5 +1057,265 @@ describe("ChatWindow", () => {
 
     // The component should render without errors even if refs are null
     expect(screen.getByText("Gemini Assistant")).toBeInTheDocument();
+  });
+
+  it("enables auto-scroll when user scrolls near the bottom", async () => {
+    const initialStore = mockStore(
+      createMockState({
+        chat: {
+          chats: [{ id: "chat1", messages: [] }],
+          currentChatId: "chat1",
+        },
+      }),
+    );
+
+    const { rerender } = await act(async () => {
+      return render(
+        <Provider store={initialStore}>
+          <ChatWindow />
+        </Provider>,
+      );
+    });
+
+    const container = document.querySelector(
+      ".flex-grow.p-4.overflow-y-auto",
+    ) as HTMLElement | null;
+    const messagesEndDiv = container?.querySelector("div:last-child");
+
+    expect(container).toBeInTheDocument();
+    expect(messagesEndDiv).toBeInTheDocument();
+
+    const spy = jest.fn();
+    Object.defineProperty(messagesEndDiv as HTMLElement, "scrollIntoView", {
+      value: spy,
+      writable: true,
+    });
+
+    // Simulate user is near bottom: distanceFromBottom <= SCROLL_THRESHOLD (80px)
+    Object.defineProperty(container as HTMLElement, "scrollHeight", {
+      value: 1000,
+      configurable: true,
+    });
+    Object.defineProperty(container as HTMLElement, "clientHeight", {
+      value: 400,
+      configurable: true,
+    });
+    (container as HTMLElement & { scrollTop: number }).scrollTop = 550; // Distance = 1000 - 550 - 400 = 50px
+
+    container?.dispatchEvent(new Event("scroll"));
+
+    // Rerender with a new message; auto-scroll should be enabled
+    const storeWithMessages = mockStore(
+      createMockState({
+        chat: {
+          chats: [
+            {
+              id: "chat1",
+              messages: [{ id: "1", text: "New message", isUser: false }],
+            },
+          ],
+          currentChatId: "chat1",
+        },
+      }),
+    );
+
+    await act(async () => {
+      rerender(
+        <Provider store={storeWithMessages}>
+          <ChatWindow />
+        </Provider>,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(spy).toHaveBeenCalledWith({ behavior: "auto" });
+  });
+
+  it("should update hastestResult when context menu opens", async () => {
+    // Mock storage to initially not have test result
+    (chrome.storage.local.get as jest.Mock).mockResolvedValue({
+      "leetcode-problem-two-sum": {
+        title: "Two Sum",
+        testResult: null,
+      },
+    });
+
+    const initialStore = mockStore(
+      createMockState({
+        ui: {
+          isChatOpen: true,
+          isChatMinimized: false,
+          chatPosition: { x: 50, y: 50 },
+          chatSize: { width: 400, height: 600 },
+          isContextOpen: false,
+        },
+      }),
+    );
+
+    const { rerender } = await renderWithStore(initialStore);
+
+    // Now update storage to have test result and open context menu
+    (chrome.storage.local.get as jest.Mock).mockResolvedValue({
+      "leetcode-problem-two-sum": {
+        title: "Two Sum",
+        testResult: { status: "passed" },
+      },
+    });
+
+    const storeWithContext = mockStore(
+      createMockState({
+        ui: {
+          isChatOpen: true,
+          isChatMinimized: false,
+          chatPosition: { x: 50, y: 50 },
+          chatSize: { width: 400, height: 600 },
+          isContextOpen: true, // Context menu opened
+        },
+      }),
+    );
+
+    await act(async () => {
+      rerender(
+        <Provider store={storeWithContext}>
+          <ChatWindow />
+        </Provider>,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    // Verify chrome storage was called with the correct key
+    expect(chrome.storage.local.get).toHaveBeenCalledWith(
+      "leetcode-problem-two-sum",
+    );
+  });
+
+  it("should handle Test Result context when available", async () => {
+    (chrome.storage.local.get as jest.Mock).mockResolvedValue({
+      "leetcode-problem-two-sum": {
+        title: "Two Sum",
+        description: "Problem description",
+        code: "function solution() {}",
+        testResult: { status: "passed", output: "All tests passed" },
+      },
+    });
+
+    const mockDispatch = jest.fn().mockImplementation((action) => {
+      if (typeof action === "function") {
+        return action(mockDispatch, () => mockStateData, undefined);
+      }
+      return action;
+    });
+
+    const mockStateData = createMockState({
+      chat: {
+        chats: [{ id: "chat1", messages: [] }],
+        currentChatId: "chat1",
+        selectedContexts: ["Test Result"], // Test Result selected
+      },
+    });
+
+    const store = {
+      dispatch: mockDispatch,
+      getState: () => mockStateData,
+      subscribe: jest.fn(),
+      replaceReducer: jest.fn(),
+      [Symbol.observable]: jest.fn(),
+    } as unknown as ReturnType<typeof mockStore>;
+
+    await act(async () => {
+      render(
+        <Provider store={store}>
+          <ChatWindow />
+        </Provider>,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const input = screen.getByRole("textbox");
+    const sendButton = screen.getByRole("button", { name: /Send/i });
+
+    fireEvent.change(input, { target: { value: "Test with test result" } });
+    fireEvent.click(sendButton);
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+
+    // Verify the API was called with test result
+    expect(mockCallGeminiApi).toHaveBeenCalledWith(
+      "test-api-key",
+      "gemini-2.5-pro",
+      [],
+      null,
+      null,
+      expect.stringContaining("passed"), // Test result should be included
+      "Test with test result",
+      true,
+    );
+  });
+
+  it("should handle all contexts selected together", async () => {
+    (chrome.storage.local.get as jest.Mock).mockResolvedValue({
+      "leetcode-problem-two-sum": {
+        title: "Two Sum",
+        description: "Problem description",
+        code: "function solution() {}",
+        testResult: { status: "passed" },
+      },
+    });
+
+    const mockDispatch = jest.fn().mockImplementation((action) => {
+      if (typeof action === "function") {
+        return action(mockDispatch, () => mockStateData, undefined);
+      }
+      return action;
+    });
+
+    const mockStateData = createMockState({
+      chat: {
+        chats: [{ id: "chat1", messages: [] }],
+        currentChatId: "chat1",
+        selectedContexts: ["Problem Details", "Code", "Test Result"],
+      },
+    });
+
+    const store = {
+      dispatch: mockDispatch,
+      getState: () => mockStateData,
+      subscribe: jest.fn(),
+      replaceReducer: jest.fn(),
+      [Symbol.observable]: jest.fn(),
+    } as unknown as ReturnType<typeof mockStore>;
+
+    await act(async () => {
+      render(
+        <Provider store={store}>
+          <ChatWindow />
+        </Provider>,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const input = screen.getByRole("textbox");
+    const sendButton = screen.getByRole("button", { name: /Send/i });
+
+    fireEvent.change(input, { target: { value: "Test all contexts" } });
+    fireEvent.click(sendButton);
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+
+    // Verify the API was called with all contexts
+    expect(mockCallGeminiApi).toHaveBeenCalledWith(
+      "test-api-key",
+      "gemini-2.5-pro",
+      [],
+      expect.stringContaining("Two Sum"), // Problem details
+      "function solution() {}", // Code
+      expect.stringContaining("passed"), // Test result
+      "Test all contexts",
+      true,
+    );
   });
 });

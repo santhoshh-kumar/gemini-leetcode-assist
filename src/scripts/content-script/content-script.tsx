@@ -1,5 +1,5 @@
 import "@/index.css";
-import { parseLeetCodeProblem } from "./parser";
+import { parseLeetCodeProblem, parseLeetCodetestResult } from "./parser";
 import store from "@/state/store";
 import { toggleChat } from "@/state/slices/uiSlice";
 import { createRoot } from "react-dom/client";
@@ -10,10 +10,16 @@ import { setProblemSlug } from "@/state/slices/problemSlice";
 let problemDetails: Awaited<ReturnType<typeof parseLeetCodeProblem>> | null =
   null;
 let lastSentCode: string | null = null;
+let lastTestResult: Awaited<ReturnType<typeof parseLeetCodetestResult>> | null =
+  null;
+let lastSentTestResult: Awaited<
+  ReturnType<typeof parseLeetCodetestResult>
+> | null = null;
+let activeIntervals: number[] = [];
 
 // --- Function to send combined data to background ---
 function sendUnifiedUpdate(code: string) {
-  if (!problemDetails || code === lastSentCode) {
+  if (!problemDetails) {
     return;
   }
 
@@ -22,10 +28,20 @@ function sendUnifiedUpdate(code: string) {
     return;
   }
 
+  const codeChanged = code !== lastSentCode;
+  const testResultChanged =
+    JSON.stringify(lastTestResult) !== JSON.stringify(lastSentTestResult);
+
+  if (!codeChanged && !testResultChanged) {
+    return; // Don't send duplicate updates
+  }
+
   const payload = {
     ...problemDetails,
     code,
     timestamp: new Date().toISOString(),
+    // include latest parsed Test Result (may be null)
+    testResult: lastTestResult,
   };
 
   chrome.runtime.sendMessage({
@@ -37,6 +53,7 @@ function sendUnifiedUpdate(code: string) {
   });
 
   lastSentCode = code; // Remember the last code we sent
+  lastSentTestResult = lastTestResult; // Remember the last testResult we sent
 }
 
 // 1. Inject the script for live code capture
@@ -83,6 +100,8 @@ function handleProblemChange() {
         if (details.title !== problemDetails?.title) {
           store.dispatch(setProblemSlug(problemSlug));
           problemDetails = details;
+          lastTestResult = null;
+          lastSentTestResult = null;
 
           // If we have already received code, send the first unified update
           if (lastSentCode !== null) {
@@ -134,6 +153,99 @@ observer.observe(document.body, {
   subtree: true,
 });
 
+// --- Observe for Run button ---
+function attachRunButtonListener() {
+  const runButton = document.querySelector(
+    'button[data-e2e-locator="console-run-button"]',
+  );
+  if (runButton && !runButton.hasAttribute("data-monitor-attached")) {
+    runButton.setAttribute("data-monitor-attached", "true");
+    runButton.addEventListener("click", monitorTestResult);
+  }
+}
+
+const buttonObserver = new MutationObserver(() => {
+  attachRunButtonListener();
+});
+
+// Start observing for the run button
+buttonObserver.observe(document.body, {
+  childList: true,
+  subtree: true,
+});
+
+// Also check for existing button immediately
+attachRunButtonListener();
+
+// --- Function to monitor for Test Result after run ---
+function monitorTestResult() {
+  // Clear any existing monitor intervals
+  activeIntervals.forEach(clearInterval);
+  activeIntervals.length = 0;
+
+  let checkCount = 0;
+  const maxChecks = 40; // 20 seconds at 500ms intervals
+  const checkInterval = setInterval(() => {
+    const resultDiv = document.querySelector(
+      '[data-e2e-locator="console-result"]',
+    );
+    if (
+      resultDiv &&
+      (resultDiv.textContent?.includes("Wrong Answer") ||
+        resultDiv.textContent?.includes("Accepted") ||
+        resultDiv.textContent?.includes("Compile Error") ||
+        resultDiv.textContent?.includes("Runtime Error"))
+    ) {
+      // Found result, parse Test Result
+      let testResultContainer = resultDiv.closest(".flex-1.overflow-y-auto");
+
+      // For compile errors and runtime errors, the DOM structure is different
+      if (
+        !testResultContainer &&
+        (resultDiv.textContent?.includes("Compile Error") ||
+          resultDiv.textContent?.includes("Runtime Error"))
+      ) {
+        testResultContainer = document.body; // Use document body for error parsing
+      }
+
+      if (testResultContainer) {
+        parseLeetCodetestResult(testResultContainer)
+          .then((results) => {
+            if (JSON.stringify(results) !== JSON.stringify(lastTestResult)) {
+              lastTestResult = results;
+              if (lastSentCode) {
+                sendUnifiedUpdate(lastSentCode);
+              }
+            }
+          })
+          .catch((error) =>
+            console.error("Failed to parse Test Result:", error),
+          );
+      }
+      clearInterval(checkInterval);
+      activeIntervals = activeIntervals.filter(
+        (id) => id !== (checkInterval as unknown as number),
+      );
+    }
+    checkCount++;
+    if (checkCount >= maxChecks) {
+      clearInterval(checkInterval);
+      activeIntervals = activeIntervals.filter(
+        (id) => id !== (checkInterval as unknown as number),
+      );
+    }
+  }, 500);
+  activeIntervals.push(checkInterval as unknown as number);
+}
+
+// --- Listen for Ctrl + ' keypress ---
+const handleKeydown = (event: KeyboardEvent) => {
+  if (event.ctrlKey && event.key === "'") {
+    monitorTestResult();
+  }
+};
+document.addEventListener("keydown", handleKeydown);
+
 // 5. Listen for messages from the popup
 chrome.runtime.onMessage.addListener((message) => {
   if (message.type === "TOGGLE_CHAT") {
@@ -147,4 +259,8 @@ window.addEventListener("beforeunload", () => {
     clearTimeout(debounceTimer);
   }
   observer.disconnect();
+  buttonObserver.disconnect();
+  document.removeEventListener("keydown", handleKeydown);
+  activeIntervals.forEach(clearInterval);
+  activeIntervals.length = 0;
 });

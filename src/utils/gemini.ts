@@ -16,6 +16,7 @@ export type StreamEvent = {
  * @param chatHistory - The recent chat history.
  * @param problemDetails - The details of the LeetCode problem.
  * @param userCode - The user's code.
+ * @param testResult - The Test Result from running the code.
  * @param currentUserMessage - The user's latest message.
  * @param streamThoughts - Whether to stream thinking responses.
  * @returns An async generator that yields StreamEvent objects containing text chunks, thoughts, and timing metadata.
@@ -26,6 +27,7 @@ export const callGeminiApi = async function* (
   chatHistory: Chat["messages"],
   problemDetails: string | null,
   userCode: string | null,
+  testResult: string | null,
   currentUserMessage: string,
   streamThoughts: boolean,
 ) {
@@ -104,6 +106,9 @@ export const callGeminiApi = async function* (
 
           User Code:
           ${userCode || "No code provided."}
+
+          Test Result:
+          ${testResult || "No Test Result provided."}
 
           User's latest message to respond to: ${currentUserMessage}`,
         },
