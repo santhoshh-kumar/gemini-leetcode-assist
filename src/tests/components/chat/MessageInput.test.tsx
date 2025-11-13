@@ -267,8 +267,9 @@ describe("MessageInput", () => {
       </Provider>,
     );
 
-    const contextMenu = screen.getByText("Problem Details").closest("div");
-    fireEvent.mouseDown(contextMenu!);
+    const contextMenu = screen.getByRole("button", { name: /add context/i })
+      .nextElementSibling as HTMLElement;
+    fireEvent.mouseDown(contextMenu);
 
     // Should not have dispatched close actions
     const actions = store.getActions();
@@ -348,7 +349,7 @@ describe("MessageInput", () => {
 
     Object.defineProperty(textarea, "scrollHeight", {
       configurable: true,
-      value: 300, // Much taller than 6 rows
+      get: () => 300, // Much taller than 6 rows
     });
 
     fireEvent.change(textarea, {
@@ -386,7 +387,7 @@ describe("MessageInput", () => {
 
     Object.defineProperty(textarea, "scrollHeight", {
       configurable: true,
-      value: 200, // Exceeds max height
+      get: () => 200, // Exceeds max height
     });
 
     fireEvent.change(textarea, {
@@ -418,7 +419,7 @@ describe("MessageInput", () => {
     const store = mockStore(createMockState({ ui: { isContextOpen: true } }));
     render(
       <Provider store={store}>
-        <MessageInput onSendMessage={() => {}} hastestResult={true} />
+        <MessageInput onSendMessage={() => {}} hasTestResult={true} />
       </Provider>,
     );
 
@@ -431,7 +432,7 @@ describe("MessageInput", () => {
     const store = mockStore(createMockState({ ui: { isContextOpen: true } }));
     render(
       <Provider store={store}>
-        <MessageInput onSendMessage={() => {}} hastestResult={false} />
+        <MessageInput onSendMessage={() => {}} hasTestResult={false} />
       </Provider>,
     );
 
@@ -450,7 +451,7 @@ describe("MessageInput", () => {
     const store = mockStore(createMockState({ ui: { isContextOpen: true } }));
     render(
       <Provider store={store}>
-        <MessageInput onSendMessage={() => {}} hastestResult={true} />
+        <MessageInput onSendMessage={() => {}} hasTestResult={true} />
       </Provider>,
     );
 

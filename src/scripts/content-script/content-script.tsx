@@ -10,11 +10,12 @@ import { setProblemSlug } from "@/state/slices/problemSlice";
 let problemDetails: Awaited<ReturnType<typeof parseLeetCodeProblem>> | null =
   null;
 let lastSentCode: string | null = null;
-let lasttestResult: Awaited<ReturnType<typeof parseLeetCodetestResult>> | null =
+let lastTestResult: Awaited<ReturnType<typeof parseLeetCodetestResult>> | null =
   null;
 let lastSentTestResult: Awaited<
   ReturnType<typeof parseLeetCodetestResult>
 > | null = null;
+let activeIntervals: number[] = [];
 
 // --- Function to send combined data to background ---
 function sendUnifiedUpdate(code: string) {
@@ -29,7 +30,7 @@ function sendUnifiedUpdate(code: string) {
 
   const codeChanged = code !== lastSentCode;
   const testResultChanged =
-    JSON.stringify(lasttestResult) !== JSON.stringify(lastSentTestResult);
+    JSON.stringify(lastTestResult) !== JSON.stringify(lastSentTestResult);
 
   if (!codeChanged && !testResultChanged) {
     return; // Don't send duplicate updates
@@ -40,7 +41,7 @@ function sendUnifiedUpdate(code: string) {
     code,
     timestamp: new Date().toISOString(),
     // include latest parsed Test Result (may be null)
-    testResult: lasttestResult,
+    testResult: lastTestResult,
   };
 
   chrome.runtime.sendMessage({
@@ -52,7 +53,7 @@ function sendUnifiedUpdate(code: string) {
   });
 
   lastSentCode = code; // Remember the last code we sent
-  lastSentTestResult = lasttestResult; // Remember the last testResult we sent
+  lastSentTestResult = lastTestResult; // Remember the last testResult we sent
 }
 
 // 1. Inject the script for live code capture
@@ -99,7 +100,7 @@ function handleProblemChange() {
         if (details.title !== problemDetails?.title) {
           store.dispatch(setProblemSlug(problemSlug));
           problemDetails = details;
-          lasttestResult = null;
+          lastTestResult = null;
           lastSentTestResult = null;
 
           // If we have already received code, send the first unified update
@@ -152,8 +153,41 @@ observer.observe(document.body, {
   subtree: true,
 });
 
+// --- Observe for Run button ---
+const buttonObserver = new MutationObserver(() => {
+  const runButton = document.querySelector(
+    'button[data-e2e-locator="console-run-button"]',
+  );
+  if (runButton && !runButton.hasAttribute("data-monitor-attached")) {
+    runButton.setAttribute("data-monitor-attached", "true");
+    runButton.addEventListener("click", monitorTestResult);
+  }
+});
+
+// Start observing for the run button
+buttonObserver.observe(document.body, {
+  childList: true,
+  subtree: true,
+});
+
+// Also check for existing button immediately
+const existingRunButton = document.querySelector(
+  'button[data-e2e-locator="console-run-button"]',
+);
+if (
+  existingRunButton &&
+  !existingRunButton.hasAttribute("data-monitor-attached")
+) {
+  existingRunButton.setAttribute("data-monitor-attached", "true");
+  existingRunButton.addEventListener("click", monitorTestResult);
+}
+
 // --- Function to monitor for Test Result after run ---
-function monitortestResult() {
+function monitorTestResult() {
+  // Clear any existing monitor intervals
+  activeIntervals.forEach(clearInterval);
+  activeIntervals.length = 0;
+
   let checkCount = 0;
   const maxChecks = 40; // 20 seconds at 500ms intervals
   const checkInterval = setInterval(() => {
@@ -182,8 +216,8 @@ function monitortestResult() {
       if (testResultContainer) {
         parseLeetCodetestResult(testResultContainer)
           .then((results) => {
-            if (JSON.stringify(results) !== JSON.stringify(lasttestResult)) {
-              lasttestResult = results;
+            if (JSON.stringify(results) !== JSON.stringify(lastTestResult)) {
+              lastTestResult = results;
               if (lastSentCode) {
                 sendUnifiedUpdate(lastSentCode);
               }
@@ -194,28 +228,28 @@ function monitortestResult() {
           );
       }
       clearInterval(checkInterval);
+      activeIntervals = activeIntervals.filter(
+        (id) => id !== (checkInterval as unknown as number),
+      );
     }
     checkCount++;
     if (checkCount >= maxChecks) {
       clearInterval(checkInterval);
+      activeIntervals = activeIntervals.filter(
+        (id) => id !== (checkInterval as unknown as number),
+      );
     }
   }, 500);
-}
-
-// --- Listen for Run button clicks ---
-const runButton = document.querySelector(
-  'button[data-e2e-locator="console-run-button"]',
-);
-if (runButton) {
-  runButton.addEventListener("click", monitortestResult);
+  activeIntervals.push(checkInterval as unknown as number);
 }
 
 // --- Listen for Ctrl + ' keypress ---
-document.addEventListener("keydown", (event) => {
+const handleKeydown = (event: KeyboardEvent) => {
   if (event.ctrlKey && event.key === "'") {
-    monitortestResult();
+    monitorTestResult();
   }
-});
+};
+document.addEventListener("keydown", handleKeydown);
 
 // 5. Listen for messages from the popup
 chrome.runtime.onMessage.addListener((message) => {
@@ -230,4 +264,8 @@ window.addEventListener("beforeunload", () => {
     clearTimeout(debounceTimer);
   }
   observer.disconnect();
+  buttonObserver.disconnect();
+  document.removeEventListener("keydown", handleKeydown);
+  activeIntervals.forEach(clearInterval);
+  activeIntervals.length = 0;
 });

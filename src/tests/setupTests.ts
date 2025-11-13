@@ -16,10 +16,10 @@ const mockChrome = {
   },
   storage: {
     local: {
-      get: jest.fn(),
-      set: jest.fn(),
-      remove: jest.fn(),
-      clear: jest.fn(),
+      get: jest.fn(() => Promise.resolve({})),
+      set: jest.fn(() => Promise.resolve()),
+      remove: jest.fn(() => Promise.resolve()),
+      clear: jest.fn(() => Promise.resolve()),
     },
   },
   tabs: {
@@ -32,6 +32,26 @@ const mockChrome = {
 
 // Make mockChrome available globally
 global.chrome = mockChrome as never;
+
+// Mock MutationObserver for jsdom compatibility
+global.MutationObserver = class MockMutationObserver {
+  constructor(private callback: MutationCallback) {}
+
+  observe() {
+    // Call callback immediately to simulate existing DOM elements
+    setTimeout(() => {
+      this.callback([], this);
+    }, 0);
+  }
+
+  disconnect() {
+    // Mock implementation - do nothing
+  }
+
+  takeRecords() {
+    return [];
+  }
+};
 
 // Export for explicit imports if needed
 export { mockChrome };

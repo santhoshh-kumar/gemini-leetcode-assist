@@ -1,4 +1,4 @@
-interface TestCase {
+export interface TestCase {
   input: Record<string, unknown>;
   output: string;
   expected: string | null;
@@ -95,11 +95,7 @@ export async function parseLeetCodetestResult(
           const key = labelDiv.textContent?.replace("=", "").trim();
           const valueStr = valueDiv.textContent?.trim();
           if (key && valueStr) {
-            try {
-              input[key] = JSON.parse(valueStr);
-            } catch {
-              input[key] = valueStr;
-            }
+            input[key] = safeJsonParse(valueStr);
           }
         }
       });
@@ -176,7 +172,10 @@ export async function parseLeetCodetestResult(
     const globalKeys = visibleInputResult.keys;
 
     // Parse additional collapsed if present
-    if (inputs.length > 0) {
+    // Here the collapsed means the tests that are
+    // hidden from the UI (Leetcode only shows the
+    // selected test case details in the UI, others are hidden).
+    if (inputs.length > 1) {
       const collapsedInput = inputs[1];
       const collapsedOutput = outputs.length > 1 ? outputs[1] : firstOutput;
       const collapsedExpected =
@@ -201,11 +200,7 @@ export async function parseLeetCodetestResult(
             const input: Record<string, unknown> = {};
             for (let k = 0; k < globalKeys.length; k++) {
               const valueStr = testCaseLines[k];
-              try {
-                input[globalKeys[k]] = JSON.parse(valueStr);
-              } catch {
-                input[globalKeys[k]] = valueStr;
-              }
+              input[globalKeys[k]] = safeJsonParse(valueStr);
             }
             const output = parseValue(collapsedOutput.content, j);
             const expected = parseValue(collapsedExpected.content, j);
@@ -217,6 +212,14 @@ export async function parseLeetCodetestResult(
   }
 
   return testCases;
+}
+
+function safeJsonParse(valueStr: string): unknown {
+  try {
+    return JSON.parse(valueStr);
+  } catch {
+    return valueStr;
+  }
 }
 
 function parseInput(contentDiv: Element): {
@@ -239,11 +242,7 @@ function parseInput(contentDiv: Element): {
           const key = parts[0].trim();
           const valueStr = parts.slice(1).join("=").trim();
           keys.push(key);
-          try {
-            obj[key] = JSON.parse(valueStr);
-          } catch {
-            obj[key] = valueStr;
-          }
+          obj[key] = safeJsonParse(valueStr);
         }
       }
       return { parsed: obj, keys };
@@ -264,11 +263,7 @@ function parseInput(contentDiv: Element): {
         const valueStr = valueDiv.textContent?.trim();
         if (key && valueStr) {
           keys.push(key);
-          try {
-            obj[key] = JSON.parse(valueStr);
-          } catch {
-            obj[key] = valueStr;
-          }
+          obj[key] = safeJsonParse(valueStr);
         }
       }
     }

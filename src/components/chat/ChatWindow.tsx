@@ -1,4 +1,4 @@
-import { FC, useRef, useEffect, useState, useMemo } from "react";
+import { FC, useRef, useEffect, useState, useMemo, useCallback } from "react";
 import Draggable from "react-draggable";
 import { Resizable } from "react-resizable";
 import { useSelector, useDispatch } from "react-redux";
@@ -30,6 +30,15 @@ import { setError, clearError } from "@/state/slices/apiSlice";
 import { callGeminiApi } from "@/utils/gemini";
 import { loadApiKey } from "@/state/slices/settingsSlice";
 import { X, Bot, Maximize2, Plus, History, Minimize2 } from "lucide-react";
+
+interface ProblemData {
+  title?: string;
+  testResult?: unknown;
+  description?: string;
+  constraints?: string[];
+  examples?: unknown[];
+  code?: string;
+}
 
 const ChatWindow: FC = () => {
   const dispatch: AppDispatch = useDispatch();
@@ -70,7 +79,19 @@ const ChatWindow: FC = () => {
   }, [currentProblemSlug, dispatch]);
 
   const [problemTitle, setProblemTitle] = useState<string | null>(null);
-  const [hastestResult, setHastestResult] = useState(false);
+  const [hasTestResult, setHasTestResult] = useState(false);
+
+  const loadProblemData = useCallback(async (): Promise<ProblemData | null> => {
+    if (!currentProblemSlug) return null;
+    try {
+      const key = `leetcode-problem-${currentProblemSlug}`;
+      const result = await chrome.storage.local.get(key);
+      return result[key] || null;
+    } catch (e) {
+      console.error("Error loading problem data:", e);
+      return null;
+    }
+  }, [currentProblemSlug]);
 
   const scrollToBottom = () => {
     if (
@@ -96,58 +117,51 @@ const ChatWindow: FC = () => {
 
   useEffect(() => {
     const loadProblemTitle = async () => {
-      try {
-        if (currentProblemSlug) {
-          const key = `leetcode-problem-${currentProblemSlug}`;
-
-          const result = await chrome.storage.local.get(key);
-          const problemData = result && result[key];
-
-          if (problemData) {
-            setHastestResult(!!problemData.testResult);
-          }
-          if (problemData && problemData.title) {
-            // Remove leading numbering like "1. " or "12. " from titles
-            const cleaned = String(problemData.title)
-              .replace(/^\s*\d+\.\s*/, "")
-              .trim();
-            setProblemTitle(cleaned);
-            return;
-          }
-
-          // Fallback: prettify slug into a readable title
-          const prettify = (s: string) =>
-            s
-              .replace(/[_-]+/g, " ")
-              .split(" ")
-              .filter(Boolean)
-              .map((w) => {
-                const lower = w.toLowerCase();
-                return lower.charAt(0).toUpperCase() + lower.slice(1);
-              })
-              .join(" ");
-
-          setProblemTitle(prettify(currentProblemSlug));
+      const problemData = await loadProblemData();
+      if (problemData) {
+        setHasTestResult(!!problemData.testResult);
+        if (problemData.title) {
+          // Remove leading numbering like "1. " or "12. " from titles
+          const cleaned = String(problemData.title)
+            .replace(/^\s*\d+\.\s*/, "")
+            .trim();
+          setProblemTitle(cleaned);
+          return;
         }
-      } catch (e) {
-        console.error("Error loading problem title:", e);
+      }
+
+      // Fallback: prettify slug into a readable title
+      if (currentProblemSlug) {
+        const prettify = (s: string) =>
+          s
+            .replace(/[_-]+/g, " ")
+            .split(" ")
+            .filter(Boolean)
+            .map((w) => {
+              const lower = w.toLowerCase();
+              return lower.charAt(0).toUpperCase() + lower.slice(1);
+            })
+            .join(" ");
+
+        setProblemTitle(prettify(currentProblemSlug));
+      } else {
+        setProblemTitle(null);
       }
     };
 
     loadProblemTitle();
-  }, [currentProblemSlug]);
+  }, [currentProblemSlug, loadProblemData]);
 
-  // Update hastestResult when context menu opens
+  // Update hasTestResult when context menu opens
   useEffect(() => {
-    if (isContextOpen && currentProblemSlug) {
-      const key = `leetcode-problem-${currentProblemSlug}`;
-      chrome.storage.local.get(key).then((result) => {
-        const problemData = result[key];
-        const hasResult = !!(problemData && problemData.testResult);
-        setHastestResult(hasResult);
-      });
-    }
-  }, [isContextOpen, currentProblemSlug]);
+    const updateHasTestResult = async () => {
+      if (isContextOpen && currentProblemSlug) {
+        const result = await loadProblemData();
+        setHasTestResult(!!result?.testResult);
+      }
+    };
+    updateHasTestResult();
+  }, [isContextOpen, currentProblemSlug, loadProblemData]);
 
   const handleNewChat = () => {
     dispatch(newChat());
@@ -471,7 +485,7 @@ const ChatWindow: FC = () => {
                   {apiKey ? (
                     <MessageInput
                       onSendMessage={handleSendMessage}
-                      hastestResult={hastestResult}
+                      hasTestResult={hasTestResult}
                     />
                   ) : (
                     <div className="text-center text-xs text-white/60 p-2">

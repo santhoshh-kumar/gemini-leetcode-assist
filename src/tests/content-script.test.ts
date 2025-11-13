@@ -10,9 +10,11 @@ import { RootState } from "@/state/store";
 
 // Mock parser
 const mockParseLeetCodeProblem = jest.fn();
+const mockParseLeetCodetestResult = jest.fn();
 jest.mock("../scripts/content-script/parser", () => ({
   __esModule: true,
   parseLeetCodeProblem: mockParseLeetCodeProblem,
+  parseLeetCodetestResult: mockParseLeetCodetestResult,
 }));
 
 // Create a proper store mock
@@ -340,13 +342,7 @@ describe("content-script", () => {
     ];
 
     // Mock parseLeetCodetestResult
-    const mockParseLeetCodetestResult = jest
-      .fn()
-      .mockResolvedValue(mockTestResult);
-    jest.mock("../scripts/content-script/parser", () => ({
-      parseLeetCodeProblem: mockParseLeetCodeProblem,
-      parseLeetCodetestResult: mockParseLeetCodetestResult,
-    }));
+    mockParseLeetCodetestResult.mockResolvedValueOnce(mockTestResult);
 
     await import("../scripts/content-script/content-script");
     await Promise.resolve();
@@ -376,7 +372,8 @@ describe("content-script", () => {
     `;
 
     // We can't easily test the monitortestResult function directly in this setup
-    // but we've added comprehensive parser tests
+    // but we've added comprehensive parser tests. For this E2E is added which would
+    // be more reliable.
   });
 
   it("handles keyboard shortcut Ctrl+' to trigger test monitoring", async () => {
@@ -393,8 +390,9 @@ describe("content-script", () => {
     // Dispatch the event
     document.dispatchEvent(event);
 
-    // The monitortestResult function should be triggered
-    // We can't easily test the interval logic without mocking timers
+    // The monitortestResult function should be triggered. We can't easily test
+    // the interval logic without mocking timers. For this E2E is added which would
+    // be more reliable.
   });
 
   it("attaches click listener to run button if present", async () => {
@@ -416,9 +414,9 @@ describe("content-script", () => {
 
   it("does not throw error when run button is not present", async () => {
     // Don't add run button
-    expect(
-      () => import("../scripts/content-script/content-script"),
-    ).not.toThrow();
+    await expect(
+      import("../scripts/content-script/content-script"),
+    ).resolves.toBeDefined();
   });
 
   it("sends update when code changes after test result is available", async () => {
@@ -453,7 +451,7 @@ describe("content-script", () => {
     expect(call.payload.data.timestamp).toBeDefined();
     expect(typeof call.payload.data.timestamp).toBe("string");
     // Verify it's a valid ISO string
-    expect(() => new Date(call.payload.data.timestamp)).not.toThrow();
+    expect(isNaN(Date.parse(call.payload.data.timestamp))).toBe(false);
   });
 
   it("handles same title but different problem slug", async () => {

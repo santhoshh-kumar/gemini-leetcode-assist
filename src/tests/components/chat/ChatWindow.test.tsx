@@ -463,7 +463,7 @@ describe("ChatWindow", () => {
     });
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
-      "Error loading problem title:",
+      "Error loading problem data:",
       expect.any(Error),
     );
 
