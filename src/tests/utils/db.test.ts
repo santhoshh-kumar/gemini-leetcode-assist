@@ -1,6 +1,6 @@
 jest.mock("idb");
 import { openDB } from "idb";
-import { saveChat, loadChats } from "@/utils/db";
+import { saveChat, loadChats, saveSavedResponse, loadSavedResponses } from "@/utils/db";
 
 // Cast the imported openDB to a mock function
 const mockOpenDB = openDB as jest.Mock;
@@ -262,6 +262,71 @@ describe("db utils", () => {
       ]);
 
       jest.restoreAllMocks();
+    });
+  });
+
+  describe("saveSavedResponse", () => {
+    it("should add a message ID to saved responses", async () => {
+      mockStore.get.mockResolvedValue([]);
+      await saveSavedResponse("two-sum", "msg1");
+
+      expect(mockDb.transaction).toHaveBeenCalledWith(
+        "saved-responses",
+        "readwrite",
+      );
+      expect(mockTx.objectStore).toHaveBeenCalledWith("saved-responses");
+      expect(mockStore.get).toHaveBeenCalledWith("two-sum");
+      expect(mockStore.put).toHaveBeenCalledWith(["msg1"], "two-sum");
+    });
+
+    it("should not add duplicate message IDs", async () => {
+      mockStore.get.mockResolvedValue(["msg1", "msg2"]);
+      await saveSavedResponse("two-sum", "msg1");
+
+      expect(mockStore.put).not.toHaveBeenCalled();
+    });
+
+    it("should append new message ID to existing list", async () => {
+      mockStore.get.mockResolvedValue(["msg1"]);
+      await saveSavedResponse("two-sum", "msg2");
+
+      expect(mockStore.put).toHaveBeenCalledWith(["msg1", "msg2"], "two-sum");
+    });
+
+    it("should handle empty initial list", async () => {
+      mockStore.get.mockResolvedValue(undefined);
+      await saveSavedResponse("two-sum", "msg1");
+
+      expect(mockStore.put).toHaveBeenCalledWith(["msg1"], "two-sum");
+    });
+  });
+
+  describe("loadSavedResponses", () => {
+    it("should return saved response IDs for a problem slug", async () => {
+      const mockSavedIds = ["msg1", "msg2", "msg3"];
+      mockDb.get.mockResolvedValue(mockSavedIds);
+
+      const result = await loadSavedResponses("two-sum");
+
+      expect(result).toEqual(mockSavedIds);
+      expect(mockDb.get).toHaveBeenCalledWith("saved-responses", "two-sum");
+    });
+
+    it("should return an empty array if no saved responses are found", async () => {
+      mockDb.get.mockResolvedValue(undefined);
+
+      const result = await loadSavedResponses("two-sum");
+
+      expect(result).toEqual([]);
+      expect(mockDb.get).toHaveBeenCalledWith("saved-responses", "two-sum");
+    });
+
+    it("should handle null response", async () => {
+      mockDb.get.mockResolvedValue(null);
+
+      const result = await loadSavedResponses("two-sum");
+
+      expect(result).toEqual([]);
     });
   });
 });

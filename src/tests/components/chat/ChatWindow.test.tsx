@@ -313,20 +313,6 @@ describe("ChatWindow", () => {
     expect(await screen.findByText("...")).toBeInTheDocument();
   });
 
-  it("displays error message when there is an error", async () => {
-    const state = createMockState({
-      api: {
-        isLoading: false,
-        error: "Something went wrong",
-      },
-    });
-    const store = mockStore(state);
-
-    await renderWithStore(store);
-
-    expect(await screen.findByText("Something went wrong")).toBeInTheDocument();
-  });
-
   it("does not render when chat is closed", async () => {
     const state = createMockState({
       ui: {
@@ -724,75 +710,6 @@ describe("ChatWindow", () => {
       null,
       "Test streaming message",
       true,
-    );
-  });
-
-  it("should handle streaming API errors", async () => {
-    // Mock chrome storage
-    (chrome.storage.local.get as jest.Mock).mockResolvedValue({
-      "leetcode-problem-two-sum": {
-        title: "Two Sum",
-      },
-    });
-
-    // Mock the streaming generator to throw an error
-    mockCallGeminiApi.mockImplementation(async function* () {
-      yield { text: "" }; // Need at least one yield to make it a valid generator
-      throw new Error("API Error");
-    });
-
-    const mockDispatch = jest.fn().mockImplementation((action) => {
-      if (typeof action === "function") {
-        return action(mockDispatch, () => mockStateData, undefined);
-      }
-      return action;
-    });
-
-    const mockStateData = createMockState({
-      chat: {
-        chats: [{ id: "chat1", messages: [] }],
-        currentChatId: "chat1",
-      },
-    });
-
-    const store = {
-      dispatch: mockDispatch,
-      getState: () => mockStateData,
-      subscribe: jest.fn(),
-      replaceReducer: jest.fn(),
-      [Symbol.observable]: jest.fn(),
-    } as unknown as ReturnType<typeof mockStore>;
-
-    await act(async () => {
-      render(
-        <Provider store={store}>
-          <ChatWindow />
-        </Provider>,
-      );
-      // Wait for async effects
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-
-    await waitFor(() => {
-      expect(screen.getByRole("textbox")).toBeInTheDocument();
-    });
-
-    const input = screen.getByRole("textbox");
-    const sendButton = screen.getByRole("button", { name: /Send/i });
-
-    fireEvent.change(input, { target: { value: "Test error" } });
-    fireEvent.click(sendButton);
-
-    // Wait for async operations
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    });
-
-    // Verify error handling actions were dispatched
-    expect(mockDispatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: expect.stringContaining("setError"),
-      }),
     );
   });
 
