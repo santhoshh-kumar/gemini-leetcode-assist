@@ -324,6 +324,23 @@ const chatSlice = createSlice({
         }
       }
     },
+    removeMessagesAfter: (
+      state,
+      action: PayloadAction<{
+        chatId: string;
+        messageId: string;
+      }>,
+    ) => {
+      const { chatId, messageId } = action.payload;
+      const chat = state.chats.find((c) => c.id === chatId);
+      if (chat) {
+        const index = chat.messages.findIndex((m) => m.id === messageId);
+        if (index > -1) {
+          chat.messages = chat.messages.slice(0, index);
+          chat.lastUpdated = Date.now();
+        }
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -476,5 +493,6 @@ export const {
   updateStreamingMessage,
   finishStreamingMessage,
   failStreamingMessage,
+  removeMessagesAfter,
 } = chatSlice.actions;
 export default chatSlice.reducer;

@@ -6,6 +6,10 @@ interface LeetCodeAssistantDB extends DBSchema {
     key: string;
     value: Chat[];
   };
+  "saved-responses": {
+    key: string;
+    value: string[];
+  };
 }
 
 let dbPromise: Promise<import("idb").IDBPDatabase<LeetCodeAssistantDB>> | null =
@@ -13,9 +17,14 @@ let dbPromise: Promise<import("idb").IDBPDatabase<LeetCodeAssistantDB>> | null =
 
 const getDB = () => {
   if (!dbPromise) {
-    dbPromise = openDB<LeetCodeAssistantDB>("leetcode-assistant", 1, {
-      upgrade(db) {
-        db.createObjectStore("chats");
+    dbPromise = openDB<LeetCodeAssistantDB>("leetcode-assistant", 2, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          db.createObjectStore("chats");
+        }
+        if (oldVersion < 2) {
+          db.createObjectStore("saved-responses");
+        }
       },
     });
   }
@@ -77,4 +86,26 @@ export const loadChats = async (problemSlug: string): Promise<Chat[]> => {
     ...chat,
     lastUpdated: chat.lastUpdated ?? Date.now(),
   }));
+};
+
+export const saveSavedResponse = async (
+  problemSlug: string,
+  messageId: string,
+): Promise<void> => {
+  const db = await getDB();
+  const tx = db.transaction("saved-responses", "readwrite");
+  const store = tx.objectStore("saved-responses");
+  const saved = (await store.get(problemSlug)) || [];
+  if (!saved.includes(messageId)) {
+    saved.push(messageId);
+    store.put(saved, problemSlug);
+  }
+  await tx.done;
+};
+
+export const loadSavedResponses = async (
+  problemSlug: string,
+): Promise<string[]> => {
+  const db = await getDB();
+  return (await db.get("saved-responses", problemSlug)) || [];
 };

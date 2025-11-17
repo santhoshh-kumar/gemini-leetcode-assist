@@ -24,11 +24,14 @@ import {
   updateThinkingState,
   setThinkingStartTime,
   setThinkingEndTime,
+  removeMessagesAfter,
 } from "@/state/slices/chatSlice";
 import { nanoid } from "@reduxjs/toolkit";
 import { setError, clearError } from "@/state/slices/apiSlice";
 import { callGeminiApi } from "@/utils/gemini";
 import { loadApiKey } from "@/state/slices/settingsSlice";
+import { saveSavedResponse } from "@/utils/db";
+import removeMd from "remove-markdown";
 import { PROCESSING_MESSAGE } from "@/constants/chat";
 import {
   GEMINI_ASSISTANT_TITLE,
@@ -181,7 +184,7 @@ const ChatWindow: FC = () => {
     dispatch(setChatHistoryOpen(!isChatHistoryOpen));
   };
 
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (text: string, skipAddUserMessage = false) => {
     if (!currentProblemSlug) return;
 
     dispatch(clearError());
@@ -193,15 +196,17 @@ const ChatWindow: FC = () => {
     const userMessageId = nanoid();
     const chatId = currentChatId || nanoid();
 
-    dispatch(
-      addMessage({
-        text,
-        isUser: true,
-        problemSlug: currentProblemSlug,
-        messageId: userMessageId,
-        chatId,
-      }),
-    );
+    if (!skipAddUserMessage) {
+      dispatch(
+        addMessage({
+          text,
+          isUser: true,
+          problemSlug: currentProblemSlug,
+          messageId: userMessageId,
+          chatId,
+        }),
+      );
+    }
 
     const assistantMessageId = nanoid();
 
@@ -325,7 +330,6 @@ const ChatWindow: FC = () => {
           errorMessage: (error as Error).message,
         }),
       );
-      dispatch(setError((error as Error).message));
     }
   };
 
@@ -474,22 +478,57 @@ const ChatWindow: FC = () => {
                     </div>
                   ) : (
                     <>
-                      {messages.map((msg) => (
-                        <ChatMessage
-                          key={msg.id}
-                          text={msg.text}
-                          isUser={msg.isUser}
-                          status={msg.status}
-                          thinking={msg.thinking}
-                          thinkingStartTime={msg.thinkingStartTime}
-                          thinkingEndTime={msg.thinkingEndTime}
-                        />
-                      ))}
+                      {messages.map((msg) => {
+                        const handleCopyText = async (setFeedback: (msg: string) => void) => {
+                          await navigator.clipboard.writeText(removeMd(msg.text));
+                          setFeedback("Copied text!");
+                          setTimeout(() => setFeedback(null), 2000);
+                        };
+                        const handleCopyMarkdown = async (setFeedback: (msg: string) => void) => {
+                          await navigator.clipboard.writeText(msg.text);
+                          setFeedback("Copied markdown!");
+                          setTimeout(() => setFeedback(null), 2000);
+                        };
+                        const handleSave = async (setFeedback: (msg: string) => void) => {
+                          if (currentProblemSlug && msg.id) {
+                            await saveSavedResponse(currentProblemSlug, msg.id);
+                            setFeedback("Saved!");
+                            setTimeout(() => setFeedback(null), 2000);
+                          }
+                        };
+                        const handleRetry = () => {
+                          if (!currentChatId || !msg.id) return;
+                          const chat = chats.find((c) => c.id === currentChatId);
+                          if (!chat) return;
+                          const index = chat.messages.findIndex((m) => m.id === msg.id);
+                          if (index === -1) return;
+                          let lastUserIndex = -1;
+                          for (let i = index - 1; i >= 0; i--) {
+                            if (chat.messages[i].isUser) {
+                              lastUserIndex = i;
+                              break;
+                            }
+                          }
+                          if (lastUserIndex === -1) return;
+                          const userText = chat.messages[lastUserIndex].text;
+                          dispatch(removeMessagesAfter({ chatId: currentChatId, messageId: msg.id }));
+                          handleSendMessage(userText, true);
+                        };
+                        return (
+                          <ChatMessage
+                            key={msg.id}
+                            message={msg}
+                            onCopyText={!msg.isUser && msg.id ? handleCopyText : undefined}
+                            onCopyMarkdown={!msg.isUser && msg.id ? handleCopyMarkdown : undefined}
+                            onSave={!msg.isUser && msg.id ? handleSave : undefined}
+                            onRetry={!msg.isUser && msg.id ? handleRetry : undefined}
+                          />
+                        );
+                      })}
                     </>
                   )}
 
                   {isLoading && <ChatMessage text="..." isUser={false} />}
-                  {error && <ChatMessage text={error} isUser={false} />}
                   <div ref={messagesEndRef} />
                 </div>
                 <div className="p-2">

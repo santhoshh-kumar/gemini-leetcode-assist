@@ -1,6 +1,5 @@
 import { FC, useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { toggleChat } from "@/state/slices/uiSlice";
 import { saveApiKey, loadApiKey } from "@/state/slices/settingsSlice";
 import { RootState, AppDispatch } from "@/state/store";
 import { Settings, MessageSquare, ArrowLeft } from "lucide-react";
@@ -29,7 +28,6 @@ const Popup: FC = () => {
             );
           }
         });
-        dispatch(toggleChat());
       } else {
         console.error("Popup: Could not get active tab ID");
       }
