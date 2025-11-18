@@ -31,7 +31,7 @@ import { setError, clearError } from "@/state/slices/apiSlice";
 import { callGeminiApi } from "@/utils/gemini";
 import { loadApiKey } from "@/state/slices/settingsSlice";
 import { saveSavedResponse } from "@/utils/db";
-import removeMd from "remove-markdown";
+import { stripMarkdown } from "@/utils/markdown";
 import { PROCESSING_MESSAGE } from "@/constants/chat";
 import {
   GEMINI_ASSISTANT_TITLE,
@@ -480,7 +480,7 @@ const ChatWindow: FC = () => {
                     <>
                       {messages.map((msg) => {
                         const handleCopyText = async (setFeedback: (msg: string) => void) => {
-                          await navigator.clipboard.writeText(removeMd(msg.text));
+                          await navigator.clipboard.writeText(stripMarkdown(msg.text));
                           setFeedback("Copied text!");
                           setTimeout(() => setFeedback(null), 2000);
                         };
