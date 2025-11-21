@@ -16,11 +16,17 @@ import { DEFAULT_MODEL } from "@/utils/models";
 jest.mock("@/state/slices/chatSlice", () => ({
   ...jest.requireActual("@/state/slices/chatSlice"),
   loadChats: jest.fn(),
-  addMessage: jest.fn(),
-  startStreamingMessage: jest.fn(),
-  updateStreamingMessage: jest.fn(),
-  finishStreamingMessageAndSave: jest.fn(),
-  failStreamingMessage: jest.fn(),
+  addMessage: jest.fn((payload) => ({ type: "chat/addMessage", payload })),
+  startStreamingMessage: jest.fn((payload) => ({ type: "chat/startStreamingMessage", payload })),
+  updateStreamingMessage: jest.fn((payload) => ({ type: "chat/updateStreamingMessage", payload })),
+  finishStreamingMessageAndSave: jest.fn((payload) => ({ type: "chat/finishStreamingMessageAndSave", payload })),
+  failStreamingMessage: jest.fn((payload) => ({ type: "chat/failStreamingMessage", payload })),
+  updateThinkingState: jest.fn((payload) => ({ type: "chat/updateThinkingState", payload })),
+  setThinkingStartTime: jest.fn((payload) => ({ type: "chat/setThinkingStartTime", payload })),
+  setThinkingEndTime: jest.fn((payload) => ({ type: "chat/setThinkingEndTime", payload })),
+  removeMessagesAfter: jest.fn((payload) => ({ type: "chat/removeMessagesAfter", payload })),
+  newChat: jest.fn(() => ({ type: "chat/newChat" })),
+  setChatHistoryOpen: jest.fn((payload) => ({ type: "chat/setChatHistoryOpen", payload })),
 }));
 
 jest.mock("@/state/slices/settingsSlice", () => ({
@@ -1235,5 +1241,260 @@ describe("ChatWindow", () => {
       "Test all contexts",
       true,
     );
+  });
+
+  it("should handle streaming error and dispatch failStreamingMessage", async () => {
+    // Mock chrome storage
+    (chrome.storage.local.get as jest.Mock).mockResolvedValue({
+      "leetcode-problem-two-sum": {
+        title: "Two Sum",
+      },
+    });
+
+    // Mock the streaming generator to throw an error
+    mockCallGeminiApi.mockImplementation(async function* () {
+      yield { text: "Starting..." };
+      throw new Error("Streaming failed");
+    });
+
+    const mockDispatch = jest.fn().mockImplementation((action) => {
+      if (typeof action === "function") {
+        return action(mockDispatch, () => mockStateData, undefined);
+      }
+      return action;
+    });
+
+    const mockStateData = createMockState({
+      chat: {
+        chats: [{ id: "chat1", messages: [] }],
+        currentChatId: "chat1",
+      },
+    });
+
+    const store = {
+      dispatch: mockDispatch,
+      getState: () => mockStateData,
+      subscribe: jest.fn(),
+      replaceReducer: jest.fn(),
+      [Symbol.observable]: jest.fn(),
+    } as unknown as ReturnType<typeof mockStore>;
+
+    await act(async () => {
+      render(
+        <Provider store={store}>
+          <ChatWindow />
+        </Provider>,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const input = screen.getByRole("textbox");
+    const sendButton = screen.getByRole("button", { name: /Send/i });
+
+    fireEvent.change(input, { target: { value: "Test error handling" } });
+    fireEvent.click(sendButton);
+
+    // Wait for async operations
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+
+    // Verify that failStreamingMessage was dispatched with the error
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: expect.stringContaining("failStreamingMessage"),
+        payload: expect.objectContaining({
+          errorMessage: "Streaming failed",
+        }),
+      }),
+    );
+  });
+
+  it("should handle streaming with text chunks only (no thinking)", async () => {
+    // Mock chrome storage
+    (chrome.storage.local.get as jest.Mock).mockResolvedValue({
+      "leetcode-problem-two-sum": {
+        title: "Two Sum",
+      },
+    });
+
+    // Mock the streaming generator to yield only text chunks
+    mockCallGeminiApi.mockImplementation(async function* () {
+      yield { text: "First " };
+      yield { text: "chunk" };
+      yield { text: " of " };
+      yield { text: "response" };
+    });
+
+    const mockDispatch = jest.fn().mockImplementation((action) => {
+      if (typeof action === "function") {
+        return action(mockDispatch, () => mockStateData, undefined);
+      }
+      return action;
+    });
+
+    const mockStateData = createMockState({
+      chat: {
+        chats: [{ id: "chat1", messages: [] }],
+        currentChatId: "chat1",
+      },
+    });
+
+    const store = {
+      dispatch: mockDispatch,
+      getState: () => mockStateData,
+      subscribe: jest.fn(),
+      replaceReducer: jest.fn(),
+      [Symbol.observable]: jest.fn(),
+    } as unknown as ReturnType<typeof mockStore>;
+
+    await act(async () => {
+      render(
+        <Provider store={store}>
+          <ChatWindow />
+        </Provider>,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const input = screen.getByRole("textbox");
+    const sendButton = screen.getByRole("button", { name: /Send/i });
+
+    fireEvent.change(input, { target: { value: "Test text chunks" } });
+    fireEvent.click(sendButton);
+
+    // Wait for async operations
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+
+    // Verify that updateStreamingMessage was called for text chunks
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: expect.stringContaining("updateStreamingMessage"),
+        payload: expect.objectContaining({
+          textChunk: "First ",
+        }),
+      }),
+    );
+
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: expect.stringContaining("updateStreamingMessage"),
+        payload: expect.objectContaining({
+          textChunk: "chunk",
+        }),
+      }),
+    );
+
+    // Verify that finishStreamingMessageAndSave was called
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: expect.stringContaining("finishStreamingMessageAndSave"),
+      }),
+    );
+  });
+
+  it("should handle streaming with undefined text chunks", async () => {
+    // Mock chrome storage
+    (chrome.storage.local.get as jest.Mock).mockResolvedValue({
+      "leetcode-problem-two-sum": {
+        title: "Two Sum",
+      },
+    });
+
+    // Mock the streaming generator to yield chunks with undefined text
+    mockCallGeminiApi.mockImplementation(async function* () {
+      yield { text: undefined };
+      yield { text: "Valid text" };
+    });
+
+    const mockDispatch = jest.fn().mockImplementation((action) => {
+      if (typeof action === "function") {
+        return action(mockDispatch, () => mockStateData, undefined);
+      }
+      return action;
+    });
+
+    const mockStateData = createMockState({
+      chat: {
+        chats: [{ id: "chat1", messages: [] }],
+        currentChatId: "chat1",
+      },
+    });
+
+    const store = {
+      dispatch: mockDispatch,
+      getState: () => mockStateData,
+      subscribe: jest.fn(),
+      replaceReducer: jest.fn(),
+      [Symbol.observable]: jest.fn(),
+    } as unknown as ReturnType<typeof mockStore>;
+
+    await act(async () => {
+      render(
+        <Provider store={store}>
+          <ChatWindow />
+        </Provider>,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const input = screen.getByRole("textbox");
+    const sendButton = screen.getByRole("button", { name: /Send/i });
+
+    fireEvent.change(input, { target: { value: "Test undefined text" } });
+    fireEvent.click(sendButton);
+
+    // Wait for async operations
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+
+    // Verify that only valid text chunks trigger updateStreamingMessage
+    expect(mockDispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: expect.stringContaining("updateStreamingMessage"),
+        payload: expect.objectContaining({
+          textChunk: "Valid text",
+        }),
+      }),
+    );
+
+    // Should not have been called for undefined text
+    const updateCalls = mockDispatch.mock.calls.filter(call =>
+      call[0]?.type?.includes("updateStreamingMessage") &&
+      call[0]?.payload?.textChunk === undefined
+    );
+    expect(updateCalls.length).toBe(0);
+  });
+
+  it("should render ChatMessage components with correct props", async () => {
+    const state = createMockState({
+      chat: {
+        chats: [
+          {
+            id: "chat1",
+            messages: [
+              { id: "1", text: "User message", isUser: true },
+              { id: "2", text: "Bot message", isUser: false },
+            ],
+          },
+        ],
+        currentChatId: "chat1",
+      },
+    });
+    const store = mockStore(state);
+
+    await renderWithStore(store);
+
+    // Verify that ChatMessage components are rendered with correct props
+    await waitFor(() => {
+      expect(screen.getByText("User message")).toBeInTheDocument();
+      expect(screen.getByText("Bot message")).toBeInTheDocument();
+    });
+
+    // The ChatMessage components should have been rendered with the correct props
+    // This test ensures the messages.map code path is executed
   });
 });

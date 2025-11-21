@@ -92,6 +92,7 @@ const ChatWindow: FC = () => {
 
   const [problemTitle, setProblemTitle] = useState<string | null>(null);
   const [hasTestResult, setHasTestResult] = useState(false);
+  const [feedbacks, setFeedbacks] = useState<Record<string, string | null>>({});
 
   const loadProblemData = useCallback(async (): Promise<ProblemData | null> => {
     if (!currentProblemSlug) return null;
@@ -184,7 +185,7 @@ const ChatWindow: FC = () => {
     dispatch(setChatHistoryOpen(!isChatHistoryOpen));
   };
 
-  const handleSendMessage = async (text: string, skipAddUserMessage = false) => {
+  const handleSendMessage = useCallback(async (text: string, skipAddUserMessage = false) => {
     if (!currentProblemSlug) return;
 
     dispatch(clearError());
@@ -331,7 +332,46 @@ const ChatWindow: FC = () => {
         }),
       );
     }
-  };
+  }, [currentProblemSlug, apiKey, selectedModel, chats, currentChatId, selectedContexts, dispatch]);
+
+  const handleCopyText = useCallback(async (messageId: string, text: string) => {
+    await navigator.clipboard.writeText(stripMarkdown(text));
+    setFeedbacks(f => ({ ...f, [messageId]: 'Copied text!' }));
+    setTimeout(() => setFeedbacks(f => ({ ...f, [messageId]: null })), 2000);
+  }, []);
+
+  const handleCopyMarkdown = useCallback(async (messageId: string, text: string) => {
+    await navigator.clipboard.writeText(text);
+    setFeedbacks(f => ({ ...f, [messageId]: 'Copied markdown!' }));
+    setTimeout(() => setFeedbacks(f => ({ ...f, [messageId]: null })), 2000);
+  }, []);
+
+  const handleSave = useCallback(async (messageId: string, problemSlug: string | null) => {
+    if (problemSlug && messageId) {
+      await saveSavedResponse(problemSlug, messageId);
+      setFeedbacks(f => ({ ...f, [messageId]: 'Saved!' }));
+      setTimeout(() => setFeedbacks(f => ({ ...f, [messageId]: null })), 2000);
+    }
+  }, []);
+
+  const handleRetry = useCallback((messageId: string) => {
+    if (!currentChatId || !messageId) return;
+    const chat = chats.find((c) => c.id === currentChatId);
+    if (!chat) return;
+    const index = chat.messages.findIndex((m) => m.id === messageId);
+    if (index === -1) return;
+    let lastUserIndex = -1;
+    for (let i = index - 1; i >= 0; i--) {
+      if (chat.messages[i].isUser) {
+        lastUserIndex = i;
+        break;
+      }
+    }
+    if (lastUserIndex === -1) return;
+    const userText = chat.messages[lastUserIndex].text;
+    dispatch(removeMessagesAfter({ chatId: currentChatId, messageId }));
+    handleSendMessage(userText, true);
+  }, [currentChatId, chats, dispatch, handleSendMessage]);
 
   const messages = useMemo(() => {
     const currentChat = chats.find((chat) => chat.id === currentChatId);
@@ -478,53 +518,17 @@ const ChatWindow: FC = () => {
                     </div>
                   ) : (
                     <>
-                      {messages.map((msg) => {
-                        const handleCopyText = async (setFeedback: (msg: string) => void) => {
-                          await navigator.clipboard.writeText(stripMarkdown(msg.text));
-                          setFeedback("Copied text!");
-                          setTimeout(() => setFeedback(null), 2000);
-                        };
-                        const handleCopyMarkdown = async (setFeedback: (msg: string) => void) => {
-                          await navigator.clipboard.writeText(msg.text);
-                          setFeedback("Copied markdown!");
-                          setTimeout(() => setFeedback(null), 2000);
-                        };
-                        const handleSave = async (setFeedback: (msg: string) => void) => {
-                          if (currentProblemSlug && msg.id) {
-                            await saveSavedResponse(currentProblemSlug, msg.id);
-                            setFeedback("Saved!");
-                            setTimeout(() => setFeedback(null), 2000);
-                          }
-                        };
-                        const handleRetry = () => {
-                          if (!currentChatId || !msg.id) return;
-                          const chat = chats.find((c) => c.id === currentChatId);
-                          if (!chat) return;
-                          const index = chat.messages.findIndex((m) => m.id === msg.id);
-                          if (index === -1) return;
-                          let lastUserIndex = -1;
-                          for (let i = index - 1; i >= 0; i--) {
-                            if (chat.messages[i].isUser) {
-                              lastUserIndex = i;
-                              break;
-                            }
-                          }
-                          if (lastUserIndex === -1) return;
-                          const userText = chat.messages[lastUserIndex].text;
-                          dispatch(removeMessagesAfter({ chatId: currentChatId, messageId: msg.id }));
-                          handleSendMessage(userText, true);
-                        };
-                        return (
-                          <ChatMessage
-                            key={msg.id}
-                            message={msg}
-                            onCopyText={!msg.isUser && msg.id ? handleCopyText : undefined}
-                            onCopyMarkdown={!msg.isUser && msg.id ? handleCopyMarkdown : undefined}
-                            onSave={!msg.isUser && msg.id ? handleSave : undefined}
-                            onRetry={!msg.isUser && msg.id ? handleRetry : undefined}
-                          />
-                        );
-                      })}
+                      {messages.map((msg) => (
+                        <ChatMessage
+                          key={msg.id}
+                          message={msg}
+                          onCopyText={!msg.isUser && msg.id ? () => handleCopyText(msg.id, msg.text) : undefined}
+                          onCopyMarkdown={!msg.isUser && msg.id ? () => handleCopyMarkdown(msg.id, msg.text) : undefined}
+                          onSave={!msg.isUser && msg.id ? () => handleSave(msg.id, currentProblemSlug) : undefined}
+                          onRetry={!msg.isUser && msg.id ? () => handleRetry(msg.id) : undefined}
+                          feedback={feedbacks[msg.id]}
+                        />
+                      ))}
                     </>
                   )}
 

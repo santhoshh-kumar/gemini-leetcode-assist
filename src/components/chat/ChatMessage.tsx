@@ -1,4 +1,4 @@
-import { FC, ReactNode, useState } from "react";
+import { FC, ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -57,10 +57,11 @@ type ChatMessageProps =
       thinking?: string[] | null;
       thinkingStartTime?: number;
       thinkingEndTime?: number;
-      onCopyText?: (setFeedback: (msg: string | null) => void) => void;
-      onCopyMarkdown?: (setFeedback: (msg: string | null) => void) => void;
-      onSave?: (setFeedback: (msg: string | null) => void) => void;
+      onCopyText?: () => void;
+      onCopyMarkdown?: () => void;
+      onSave?: () => void;
       onRetry?: () => void;
+      feedback?: string | null;
     }
   | {
       message: MessageShape & {
@@ -69,15 +70,14 @@ type ChatMessageProps =
         thinkingStartTime?: number;
         thinkingEndTime?: number;
       };
-      onCopyText?: (setFeedback: (msg: string | null) => void) => void;
-      onCopyMarkdown?: (setFeedback: (msg: string | null) => void) => void;
-      onSave?: (setFeedback: (msg: string | null) => void) => void;
+      onCopyText?: () => void;
+      onCopyMarkdown?: () => void;
+      onSave?: () => void;
       onRetry?: () => void;
+      feedback?: string | null;
     };
 
 const ChatMessage: FC<ChatMessageProps> = (props) => {
-  const [feedback, setFeedback] = useState<string | null>(null);
-
   // Support two prop shapes used across code/tests
   const text = "text" in props ? props.text : props.message?.text || "";
   const isUser =
@@ -111,6 +111,7 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
   const onCopyMarkdown = "onCopyMarkdown" in props ? props.onCopyMarkdown : undefined;
   const onSave = "onSave" in props ? props.onSave : undefined;
   const onRetry = "onRetry" in props ? props.onRetry : undefined;
+  const feedback = "feedback" in props ? props.feedback : undefined;
 
   // Calculate thinking duration in seconds
   const thinkingDuration =
@@ -185,7 +186,7 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
               {/* Copy as plain text (very small, low-opacity icon) */}
               <button
                 className="chat-action-btn w-5 h-5"
-              onClick={() => onCopyText?.(setFeedback)}
+              onClick={onCopyText}
               aria-label="Copy as text"
               title="Copy as text"
             >
@@ -195,7 +196,7 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
               {/* Copy as markdown (very small, low-opacity icon) */}
                 <button
                   className="chat-action-btn w-5 h-5"
-                onClick={() => onCopyMarkdown?.(setFeedback)}
+                onClick={onCopyMarkdown}
                 aria-label="Copy as markdown"
                 title="Copy as markdown"
               >
@@ -215,7 +216,7 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
               {/* Save (very small, low-opacity icon) */}
                 <button
                   className="chat-action-btn w-5 h-5"
-                onClick={() => onSave?.(setFeedback)}
+                onClick={onSave}
                 aria-label="Save"
                 title="Save"
               >

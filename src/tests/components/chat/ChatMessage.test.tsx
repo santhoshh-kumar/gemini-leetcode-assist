@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import ChatMessage from "@/components/chat/ChatMessage";
 
 describe("ChatMessage", () => {
@@ -138,9 +138,7 @@ describe("ChatMessage", () => {
   });
 
   it("calls onCopyText when copy text button is clicked", async () => {
-    const onCopyText = jest.fn((setFeedback) => {
-      setFeedback("Copied!");
-    });
+    const onCopyText = jest.fn();
 
     render(
       <ChatMessage
@@ -155,9 +153,6 @@ describe("ChatMessage", () => {
     fireEvent.click(copyButton);
 
     expect(onCopyText).toHaveBeenCalled();
-    await waitFor(() => {
-      expect(screen.getByText("Copied!")).toBeInTheDocument();
-    });
   });
 
   it("calls onCopyMarkdown when copy markdown button is clicked", () => {
@@ -243,27 +238,17 @@ describe("ChatMessage", () => {
     expect(errorDiv).toBeInTheDocument();
   });
 
-  it("displays feedback message after action", async () => {
-    const onCopyText = jest.fn((setFeedback) => {
-      setFeedback("Copied text!");
-      setTimeout(() => setFeedback(null), 2000);
-    });
-
+  it("displays feedback message when feedback prop is provided", () => {
     render(
       <ChatMessage
         text="Bot response"
         isUser={false}
         status="succeeded"
-        onCopyText={onCopyText}
+        feedback="Copied text!"
       />,
     );
 
-    const copyButton = screen.getByLabelText("Copy as text");
-    fireEvent.click(copyButton);
-
-    await waitFor(() => {
-      expect(screen.getByText("Copied text!")).toBeInTheDocument();
-    });
+    expect(screen.getByText("Copied text!")).toBeInTheDocument();
   });
 
   it("handles message prop with isUser field", () => {
