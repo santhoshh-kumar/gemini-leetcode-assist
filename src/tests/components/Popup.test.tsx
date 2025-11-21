@@ -3,7 +3,6 @@ import { Provider } from "react-redux";
 import configureStore, { MockStore } from "redux-mock-store";
 import Popup from "@/pages/popup/Popup";
 import { thunk } from "redux-thunk";
-import { toggleChat } from "@/state/slices/uiSlice";
 import { saveApiKey } from "@/state/slices/settingsSlice";
 
 // Create a mock store
@@ -62,14 +61,13 @@ describe("Popup", () => {
     expect(screen.getByText(/Gemini LeetCode Assist/i)).toBeInTheDocument();
   });
 
-  it("dispatches toggleChat and sends a message when 'Open Chat Window' is clicked", () => {
+  it("sends a message when 'Open Chat Window' is clicked", () => {
     render(
       <Provider store={store}>
         <Popup />
       </Provider>,
     );
     fireEvent.click(screen.getByText("Open Chat Window"));
-    expect(store.getActions()).toContainEqual(toggleChat());
     expect(chrome.tabs.sendMessage).toHaveBeenCalledWith(
       1,
       { type: "TOGGLE_CHAT" },

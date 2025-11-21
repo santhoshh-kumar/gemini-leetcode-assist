@@ -30,6 +30,15 @@
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
+/* MessageInput focus border */
+.message-input-container {
+  border-bottom: 3px solid transparent;
+}
+
+.message-input-container.message-input-focused {
+  border-color: rgba(43, 90, 160, 0.9);
+}
+
 /* Greeting style (moved from inline styles in ChatWindow) */
 .user-greeting {
   color: #1e88ff;

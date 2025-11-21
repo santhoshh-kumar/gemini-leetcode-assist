@@ -462,4 +462,29 @@ describe("MessageInput", () => {
     expect(store.getActions()).toContainEqual(addContext("Test Result"));
     expect(store.getActions()).toContainEqual(setContextOpen(false));
   });
+
+  it("applies focus border class when textarea is focused", () => {
+    const store = mockStore(createMockState());
+    const { container } = render(
+      <Provider store={store}>
+        <MessageInput onSendMessage={() => {}} />
+      </Provider>,
+    );
+
+    const textarea = screen.getByRole("textbox");
+    const messageInputContainer = container.querySelector(
+      ".message-input-container",
+    );
+
+    // Initially not focused
+    expect(messageInputContainer).not.toHaveClass("message-input-focused");
+
+    // Focus the textarea
+    fireEvent.focus(textarea);
+    expect(messageInputContainer).toHaveClass("message-input-focused");
+
+    // Blur the textarea
+    fireEvent.blur(textarea);
+    expect(messageInputContainer).not.toHaveClass("message-input-focused");
+  });
 });

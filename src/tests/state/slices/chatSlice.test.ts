@@ -14,6 +14,7 @@ import chatReducer, {
   updateThinkingState,
   setThinkingStartTime,
   setThinkingEndTime,
+  removeMessagesAfter,
   ChatState,
   Chat,
   ChatMessage,
@@ -957,6 +958,167 @@ describe("chatSlice", () => {
         const state = chatReducer(initialChatState, action);
 
         expect(state.chats[0].messages[0].thinkingEndTime).toBeUndefined();
+      });
+    });
+
+    describe("removeMessagesAfter", () => {
+      it("should remove messages after a specific message ID", () => {
+        const chatStateWithMessages: ChatState = {
+          ...initialState,
+          chats: [
+            {
+              id: chatId,
+              messages: [
+                {
+                  id: "msg1",
+                  text: "Message 1",
+                  isUser: true,
+                  status: "succeeded",
+                },
+                {
+                  id: "msg2",
+                  text: "Message 2",
+                  isUser: false,
+                  status: "succeeded",
+                },
+                {
+                  id: "msg3",
+                  text: "Message 3",
+                  isUser: true,
+                  status: "succeeded",
+                },
+                {
+                  id: "msg4",
+                  text: "Message 4",
+                  isUser: false,
+                  status: "succeeded",
+                },
+              ] as ChatMessage[],
+              lastUpdated: mockNow - 1000,
+            },
+          ],
+          currentChatId: chatId,
+        };
+
+        const action = removeMessagesAfter({
+          chatId,
+          messageId: "msg2",
+        });
+        const state = chatReducer(chatStateWithMessages, action);
+
+        expect(state.chats[0].messages.length).toBe(1);
+        expect(state.chats[0].messages[0].id).toBe("msg1");
+        expect(state.chats[0].lastUpdated).toBe(mockNow);
+      });
+
+      it("should handle removing messages at the end of the list", () => {
+        const chatStateWithMessages: ChatState = {
+          ...initialState,
+          chats: [
+            {
+              id: chatId,
+              messages: [
+                {
+                  id: "msg1",
+                  text: "Message 1",
+                  isUser: true,
+                  status: "succeeded",
+                },
+                {
+                  id: "msg2",
+                  text: "Message 2",
+                  isUser: false,
+                  status: "succeeded",
+                },
+              ] as ChatMessage[],
+              lastUpdated: mockNow - 1000,
+            },
+          ],
+          currentChatId: chatId,
+        };
+
+        const action = removeMessagesAfter({
+          chatId,
+          messageId: "msg2",
+        });
+        const state = chatReducer(chatStateWithMessages, action);
+
+        expect(state.chats[0].messages.length).toBe(1);
+      });
+
+      it("should do nothing if message ID is not found", () => {
+        const chatStateWithMessages: ChatState = {
+          ...initialState,
+          chats: [
+            {
+              id: chatId,
+              messages: [
+                {
+                  id: "msg1",
+                  text: "Message 1",
+                  isUser: true,
+                  status: "succeeded",
+                },
+              ] as ChatMessage[],
+              lastUpdated: mockNow - 1000,
+            },
+          ],
+          currentChatId: chatId,
+        };
+
+        const action = removeMessagesAfter({
+          chatId,
+          messageId: "nonexistent",
+        });
+        const state = chatReducer(chatStateWithMessages, action);
+
+        expect(state.chats[0].messages.length).toBe(1);
+        expect(state.chats[0].lastUpdated).toBe(mockNow - 1000); // Unchanged
+      });
+
+      it("should do nothing if chat doesn't exist", () => {
+        const action = removeMessagesAfter({
+          chatId: "nonexistent",
+          messageId: "msg1",
+        });
+        const state = chatReducer(initialState, action);
+
+        expect(state).toEqual(initialState);
+      });
+
+      it("should update timestamp when removing messages", () => {
+        const chatStateWithMessages: ChatState = {
+          ...initialState,
+          chats: [
+            {
+              id: chatId,
+              messages: [
+                {
+                  id: "msg1",
+                  text: "Message 1",
+                  isUser: true,
+                  status: "succeeded",
+                },
+                {
+                  id: "msg2",
+                  text: "Message 2",
+                  isUser: false,
+                  status: "failed",
+                },
+              ] as ChatMessage[],
+              lastUpdated: mockNow - 5000,
+            },
+          ],
+          currentChatId: chatId,
+        };
+
+        const action = removeMessagesAfter({
+          chatId,
+          messageId: "msg2",
+        });
+        const state = chatReducer(chatStateWithMessages, action);
+
+        expect(state.chats[0].lastUpdated).toBe(mockNow);
       });
     });
   });
