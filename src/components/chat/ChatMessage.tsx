@@ -81,7 +81,9 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
   // Support two prop shapes used across code/tests
   const text = "text" in props ? props.text : props.message?.text || "";
   const isUser =
-    "isUser" in props ? props.isUser : props.message?.isUser ?? (props.message?.sender === "user");
+    "isUser" in props
+      ? props.isUser
+      : (props.message?.isUser ?? props.message?.sender === "user");
   const status =
     "status" in props
       ? props.status
@@ -108,7 +110,8 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
         : undefined;
 
   const onCopyText = "onCopyText" in props ? props.onCopyText : undefined;
-  const onCopyMarkdown = "onCopyMarkdown" in props ? props.onCopyMarkdown : undefined;
+  const onCopyMarkdown =
+    "onCopyMarkdown" in props ? props.onCopyMarkdown : undefined;
   const onSave = "onSave" in props ? props.onSave : undefined;
   const onRetry = "onRetry" in props ? props.onRetry : undefined;
   const feedback = "feedback" in props ? props.feedback : undefined;
@@ -145,7 +148,9 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
 
   return (
     <div className="flex justify-start mb-4 bot-message">
-      <div className={`text-white max-w-[100%] markdown-container ${isFailed ? 'error-message' : ''}`}>
+      <div
+        className={`text-white max-w-[100%] markdown-container ${isFailed ? "error-message" : ""}`}
+      >
         {hasThinking && (
           <ThinkingDropdown
             thinking={thinking}
@@ -186,16 +191,16 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
               {/* Copy as plain text (very small, low-opacity icon) */}
               <button
                 className="chat-action-btn w-5 h-5"
-              onClick={onCopyText}
-              aria-label="Copy as text"
-              title="Copy as text"
-            >
-              <Copy size={13} />
-            </button>
+                onClick={onCopyText}
+                aria-label="Copy as text"
+                title="Copy as text"
+              >
+                <Copy size={13} />
+              </button>
 
               {/* Copy as markdown (very small, low-opacity icon) */}
-                <button
-                  className="chat-action-btn w-5 h-5"
+              <button
+                className="chat-action-btn w-5 h-5"
                 onClick={onCopyMarkdown}
                 aria-label="Copy as markdown"
                 title="Copy as markdown"
@@ -204,8 +209,8 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
               </button>
 
               {/* Retry (very small, low-opacity icon) */}
-                <button
-                  className="chat-action-btn w-5 h-5"
+              <button
+                className="chat-action-btn w-5 h-5"
                 onClick={onRetry}
                 aria-label="Retry"
                 title="Retry"
@@ -214,20 +219,20 @@ const ChatMessage: FC<ChatMessageProps> = (props) => {
               </button>
 
               {/* Save (very small, low-opacity icon) */}
-                <button
-                  className="chat-action-btn w-5 h-5"
+              <button
+                className="chat-action-btn w-5 h-5"
                 onClick={onSave}
                 aria-label="Save"
                 title="Save"
               >
                 <Save size={13} />
               </button>
-              </div>
-              {feedback && (
-                <div className="text-[13px] text-green-500">{feedback}</div>
-              )}
             </div>
-          )}
+            {feedback && (
+              <div className="text-[13px] text-green-500">{feedback}</div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

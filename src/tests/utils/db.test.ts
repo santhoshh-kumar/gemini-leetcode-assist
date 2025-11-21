@@ -1,6 +1,11 @@
 jest.mock("idb");
 import { openDB } from "idb";
-import { saveChat, loadChats, saveSavedResponse, loadSavedResponses } from "@/utils/db";
+import {
+  saveChat,
+  loadChats,
+  saveSavedResponse,
+  loadSavedResponses,
+} from "@/utils/db";
 
 // Cast the imported openDB to a mock function
 const mockOpenDB = openDB as jest.Mock;

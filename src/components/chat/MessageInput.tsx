@@ -123,7 +123,9 @@ const MessageInput: FC<MessageInputProps> = ({
   const disabledBg = "#6b7280"; // tailwind bg-gray-500
 
   return (
-    <div className={`bg-[#2a2a2a] rounded-lg p-1 flex flex-col gap-1 message-input-container ${isTextareaFocused ? 'message-input-focused' : ''}`}>
+    <div
+      className={`bg-[#2a2a2a] rounded-lg p-1 flex flex-col gap-1 message-input-container ${isTextareaFocused ? "message-input-focused" : ""}`}
+    >
       <div className="flex items-center gap-1 px-1 pt-1 flex-wrap">
         <div className="relative" ref={contextMenuRef}>
           <button

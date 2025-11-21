@@ -17,16 +17,43 @@ jest.mock("@/state/slices/chatSlice", () => ({
   ...jest.requireActual("@/state/slices/chatSlice"),
   loadChats: jest.fn(),
   addMessage: jest.fn((payload) => ({ type: "chat/addMessage", payload })),
-  startStreamingMessage: jest.fn((payload) => ({ type: "chat/startStreamingMessage", payload })),
-  updateStreamingMessage: jest.fn((payload) => ({ type: "chat/updateStreamingMessage", payload })),
-  finishStreamingMessageAndSave: jest.fn((payload) => ({ type: "chat/finishStreamingMessageAndSave", payload })),
-  failStreamingMessage: jest.fn((payload) => ({ type: "chat/failStreamingMessage", payload })),
-  updateThinkingState: jest.fn((payload) => ({ type: "chat/updateThinkingState", payload })),
-  setThinkingStartTime: jest.fn((payload) => ({ type: "chat/setThinkingStartTime", payload })),
-  setThinkingEndTime: jest.fn((payload) => ({ type: "chat/setThinkingEndTime", payload })),
-  removeMessagesAfter: jest.fn((payload) => ({ type: "chat/removeMessagesAfter", payload })),
+  startStreamingMessage: jest.fn((payload) => ({
+    type: "chat/startStreamingMessage",
+    payload,
+  })),
+  updateStreamingMessage: jest.fn((payload) => ({
+    type: "chat/updateStreamingMessage",
+    payload,
+  })),
+  finishStreamingMessageAndSave: jest.fn((payload) => ({
+    type: "chat/finishStreamingMessageAndSave",
+    payload,
+  })),
+  failStreamingMessage: jest.fn((payload) => ({
+    type: "chat/failStreamingMessage",
+    payload,
+  })),
+  updateThinkingState: jest.fn((payload) => ({
+    type: "chat/updateThinkingState",
+    payload,
+  })),
+  setThinkingStartTime: jest.fn((payload) => ({
+    type: "chat/setThinkingStartTime",
+    payload,
+  })),
+  setThinkingEndTime: jest.fn((payload) => ({
+    type: "chat/setThinkingEndTime",
+    payload,
+  })),
+  removeMessagesAfter: jest.fn((payload) => ({
+    type: "chat/removeMessagesAfter",
+    payload,
+  })),
   newChat: jest.fn(() => ({ type: "chat/newChat" })),
-  setChatHistoryOpen: jest.fn((payload) => ({ type: "chat/setChatHistoryOpen", payload })),
+  setChatHistoryOpen: jest.fn((payload) => ({
+    type: "chat/setChatHistoryOpen",
+    payload,
+  })),
 }));
 
 jest.mock("@/state/slices/settingsSlice", () => ({
@@ -1462,9 +1489,10 @@ describe("ChatWindow", () => {
     );
 
     // Should not have been called for undefined text
-    const updateCalls = mockDispatch.mock.calls.filter(call =>
-      call[0]?.type?.includes("updateStreamingMessage") &&
-      call[0]?.payload?.textChunk === undefined
+    const updateCalls = mockDispatch.mock.calls.filter(
+      (call) =>
+        call[0]?.type?.includes("updateStreamingMessage") &&
+        call[0]?.payload?.textChunk === undefined,
     );
     expect(updateCalls.length).toBe(0);
   });

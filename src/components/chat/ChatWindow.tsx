@@ -185,193 +185,225 @@ const ChatWindow: FC = () => {
     dispatch(setChatHistoryOpen(!isChatHistoryOpen));
   };
 
-  const handleSendMessage = useCallback(async (text: string, skipAddUserMessage = false) => {
-    if (!currentProblemSlug) return;
+  const handleSendMessage = useCallback(
+    async (text: string, skipAddUserMessage = false) => {
+      if (!currentProblemSlug) return;
 
-    dispatch(clearError());
-    if (!apiKey) {
-      dispatch(setError("API key not set."));
-      return;
-    }
+      dispatch(clearError());
+      if (!apiKey) {
+        dispatch(setError("API key not set."));
+        return;
+      }
 
-    const userMessageId = nanoid();
-    const chatId = currentChatId || nanoid();
+      const userMessageId = nanoid();
+      const chatId = currentChatId || nanoid();
 
-    if (!skipAddUserMessage) {
-      dispatch(
-        addMessage({
+      if (!skipAddUserMessage) {
+        dispatch(
+          addMessage({
+            text,
+            isUser: true,
+            problemSlug: currentProblemSlug,
+            messageId: userMessageId,
+            chatId,
+          }),
+        );
+      }
+
+      const assistantMessageId = nanoid();
+
+      try {
+        let problemDetails: string | null = null;
+        let userCode: string | null = null;
+        let testResult: string | null = null;
+
+        if (selectedContexts.length > 0 && currentProblemSlug) {
+          const key = `leetcode-problem-${currentProblemSlug}`;
+          const result = await chrome.storage.local.get(key);
+          const problemData = result[key];
+
+          if (problemData) {
+            if (selectedContexts.includes("Problem Details")) {
+              problemDetails = JSON.stringify({
+                title: problemData.title,
+                description: problemData.description,
+                constraints: problemData.constraints,
+                examples: problemData.examples,
+              });
+            }
+            if (selectedContexts.includes("Code")) {
+              userCode = problemData.code;
+            }
+            if (selectedContexts.includes("Test Result")) {
+              testResult = problemData.testResult
+                ? JSON.stringify(problemData.testResult)
+                : null;
+            }
+          }
+        }
+
+        const currentChat = chats
+          ? chats.find((chat) => chat.id === chatId)
+          : null;
+        const chatHistory = currentChat ? currentChat.messages.slice(-10) : [];
+
+        // Start streaming message with empty text
+        dispatch(
+          startStreamingMessage({
+            chatId,
+            messageId: assistantMessageId,
+            text: PROCESSING_MESSAGE,
+          }),
+        );
+
+        // Use the streaming API
+        const streamGenerator = callGeminiApi(
+          apiKey,
+          selectedModel,
+          chatHistory,
+          problemDetails,
+          userCode,
+          testResult,
           text,
-          isUser: true,
-          problemSlug: currentProblemSlug,
-          messageId: userMessageId,
-          chatId,
-        }),
+          true, // streamThoughts
+        );
+
+        for await (const chunk of streamGenerator) {
+          // Handle thinking start time
+          if (chunk.thinkingStartTime) {
+            dispatch(
+              setThinkingStartTime({
+                chatId,
+                messageId: assistantMessageId,
+                timestamp: chunk.thinkingStartTime,
+              }),
+            );
+          }
+
+          // Handle thinking end time
+          if (chunk.thinkingEndTime) {
+            dispatch(
+              setThinkingEndTime({
+                chatId,
+                messageId: assistantMessageId,
+                timestamp: chunk.thinkingEndTime,
+              }),
+            );
+          }
+
+          if (chunk.thought) {
+            dispatch(
+              updateThinkingState({
+                chatId,
+                messageId: assistantMessageId,
+                thought: chunk.thought,
+              }),
+            );
+          } else if (chunk.text !== undefined) {
+            dispatch(
+              updateStreamingMessage({
+                chatId,
+                messageId: assistantMessageId,
+                textChunk: chunk.text,
+              }),
+            );
+          }
+          // Scroll to bottom as new content streams in, but only if the user
+          // is at (or near) the bottom. If the user scrolled up we respect
+          // their position and avoid forcing the viewport back down.
+          if (autoScrollEnabledRef.current) {
+            scrollToBottom();
+          }
+        }
+
+        // Finish streaming and save to storage
+        dispatch(
+          finishStreamingMessageAndSave({
+            chatId,
+            messageId: assistantMessageId,
+            problemSlug: currentProblemSlug,
+          }),
+        );
+      } catch (error) {
+        dispatch(
+          failStreamingMessage({
+            chatId,
+            messageId: assistantMessageId,
+            errorMessage: (error as Error).message,
+          }),
+        );
+      }
+    },
+    [
+      currentProblemSlug,
+      apiKey,
+      selectedModel,
+      chats,
+      currentChatId,
+      selectedContexts,
+      dispatch,
+    ],
+  );
+
+  const handleCopyText = useCallback(
+    async (messageId: string, text: string) => {
+      await navigator.clipboard.writeText(stripMarkdown(text));
+      setFeedbacks((f) => ({ ...f, [messageId]: "Copied text!" }));
+      setTimeout(
+        () => setFeedbacks((f) => ({ ...f, [messageId]: null })),
+        2000,
       );
-    }
+    },
+    [],
+  );
 
-    const assistantMessageId = nanoid();
+  const handleCopyMarkdown = useCallback(
+    async (messageId: string, text: string) => {
+      await navigator.clipboard.writeText(text);
+      setFeedbacks((f) => ({ ...f, [messageId]: "Copied markdown!" }));
+      setTimeout(
+        () => setFeedbacks((f) => ({ ...f, [messageId]: null })),
+        2000,
+      );
+    },
+    [],
+  );
 
-    try {
-      let problemDetails: string | null = null;
-      let userCode: string | null = null;
-      let testResult: string | null = null;
+  const handleSave = useCallback(
+    async (messageId: string, problemSlug: string | null) => {
+      if (problemSlug && messageId) {
+        await saveSavedResponse(problemSlug, messageId);
+        setFeedbacks((f) => ({ ...f, [messageId]: "Saved!" }));
+        setTimeout(
+          () => setFeedbacks((f) => ({ ...f, [messageId]: null })),
+          2000,
+        );
+      }
+    },
+    [],
+  );
 
-      if (selectedContexts.length > 0 && currentProblemSlug) {
-        const key = `leetcode-problem-${currentProblemSlug}`;
-        const result = await chrome.storage.local.get(key);
-        const problemData = result[key];
-
-        if (problemData) {
-          if (selectedContexts.includes("Problem Details")) {
-            problemDetails = JSON.stringify({
-              title: problemData.title,
-              description: problemData.description,
-              constraints: problemData.constraints,
-              examples: problemData.examples,
-            });
-          }
-          if (selectedContexts.includes("Code")) {
-            userCode = problemData.code;
-          }
-          if (selectedContexts.includes("Test Result")) {
-            testResult = problemData.testResult
-              ? JSON.stringify(problemData.testResult)
-              : null;
-          }
+  const handleRetry = useCallback(
+    (messageId: string) => {
+      if (!currentChatId || !messageId) return;
+      const chat = chats.find((c) => c.id === currentChatId);
+      if (!chat) return;
+      const index = chat.messages.findIndex((m) => m.id === messageId);
+      if (index === -1) return;
+      let lastUserIndex = -1;
+      for (let i = index - 1; i >= 0; i--) {
+        if (chat.messages[i].isUser) {
+          lastUserIndex = i;
+          break;
         }
       }
-
-      const currentChat = chats
-        ? chats.find((chat) => chat.id === chatId)
-        : null;
-      const chatHistory = currentChat ? currentChat.messages.slice(-10) : [];
-
-      // Start streaming message with empty text
-      dispatch(
-        startStreamingMessage({
-          chatId,
-          messageId: assistantMessageId,
-          text: PROCESSING_MESSAGE,
-        }),
-      );
-
-      // Use the streaming API
-      const streamGenerator = callGeminiApi(
-        apiKey,
-        selectedModel,
-        chatHistory,
-        problemDetails,
-        userCode,
-        testResult,
-        text,
-        true, // streamThoughts
-      );
-
-      for await (const chunk of streamGenerator) {
-        // Handle thinking start time
-        if (chunk.thinkingStartTime) {
-          dispatch(
-            setThinkingStartTime({
-              chatId,
-              messageId: assistantMessageId,
-              timestamp: chunk.thinkingStartTime,
-            }),
-          );
-        }
-
-        // Handle thinking end time
-        if (chunk.thinkingEndTime) {
-          dispatch(
-            setThinkingEndTime({
-              chatId,
-              messageId: assistantMessageId,
-              timestamp: chunk.thinkingEndTime,
-            }),
-          );
-        }
-
-        if (chunk.thought) {
-          dispatch(
-            updateThinkingState({
-              chatId,
-              messageId: assistantMessageId,
-              thought: chunk.thought,
-            }),
-          );
-        } else if (chunk.text !== undefined) {
-          dispatch(
-            updateStreamingMessage({
-              chatId,
-              messageId: assistantMessageId,
-              textChunk: chunk.text,
-            }),
-          );
-        }
-        // Scroll to bottom as new content streams in, but only if the user
-        // is at (or near) the bottom. If the user scrolled up we respect
-        // their position and avoid forcing the viewport back down.
-        if (autoScrollEnabledRef.current) {
-          scrollToBottom();
-        }
-      }
-
-      // Finish streaming and save to storage
-      dispatch(
-        finishStreamingMessageAndSave({
-          chatId,
-          messageId: assistantMessageId,
-          problemSlug: currentProblemSlug,
-        }),
-      );
-    } catch (error) {
-      dispatch(
-        failStreamingMessage({
-          chatId,
-          messageId: assistantMessageId,
-          errorMessage: (error as Error).message,
-        }),
-      );
-    }
-  }, [currentProblemSlug, apiKey, selectedModel, chats, currentChatId, selectedContexts, dispatch]);
-
-  const handleCopyText = useCallback(async (messageId: string, text: string) => {
-    await navigator.clipboard.writeText(stripMarkdown(text));
-    setFeedbacks(f => ({ ...f, [messageId]: 'Copied text!' }));
-    setTimeout(() => setFeedbacks(f => ({ ...f, [messageId]: null })), 2000);
-  }, []);
-
-  const handleCopyMarkdown = useCallback(async (messageId: string, text: string) => {
-    await navigator.clipboard.writeText(text);
-    setFeedbacks(f => ({ ...f, [messageId]: 'Copied markdown!' }));
-    setTimeout(() => setFeedbacks(f => ({ ...f, [messageId]: null })), 2000);
-  }, []);
-
-  const handleSave = useCallback(async (messageId: string, problemSlug: string | null) => {
-    if (problemSlug && messageId) {
-      await saveSavedResponse(problemSlug, messageId);
-      setFeedbacks(f => ({ ...f, [messageId]: 'Saved!' }));
-      setTimeout(() => setFeedbacks(f => ({ ...f, [messageId]: null })), 2000);
-    }
-  }, []);
-
-  const handleRetry = useCallback((messageId: string) => {
-    if (!currentChatId || !messageId) return;
-    const chat = chats.find((c) => c.id === currentChatId);
-    if (!chat) return;
-    const index = chat.messages.findIndex((m) => m.id === messageId);
-    if (index === -1) return;
-    let lastUserIndex = -1;
-    for (let i = index - 1; i >= 0; i--) {
-      if (chat.messages[i].isUser) {
-        lastUserIndex = i;
-        break;
-      }
-    }
-    if (lastUserIndex === -1) return;
-    const userText = chat.messages[lastUserIndex].text;
-    dispatch(removeMessagesAfter({ chatId: currentChatId, messageId }));
-    handleSendMessage(userText, true);
-  }, [currentChatId, chats, dispatch, handleSendMessage]);
+      if (lastUserIndex === -1) return;
+      const userText = chat.messages[lastUserIndex].text;
+      dispatch(removeMessagesAfter({ chatId: currentChatId, messageId }));
+      handleSendMessage(userText, true);
+    },
+    [currentChatId, chats, dispatch, handleSendMessage],
+  );
 
   const messages = useMemo(() => {
     const currentChat = chats.find((chat) => chat.id === currentChatId);
@@ -522,10 +554,26 @@ const ChatWindow: FC = () => {
                         <ChatMessage
                           key={msg.id}
                           message={msg}
-                          onCopyText={!msg.isUser && msg.id ? () => handleCopyText(msg.id, msg.text) : undefined}
-                          onCopyMarkdown={!msg.isUser && msg.id ? () => handleCopyMarkdown(msg.id, msg.text) : undefined}
-                          onSave={!msg.isUser && msg.id ? () => handleSave(msg.id, currentProblemSlug) : undefined}
-                          onRetry={!msg.isUser && msg.id ? () => handleRetry(msg.id) : undefined}
+                          onCopyText={
+                            !msg.isUser && msg.id
+                              ? () => handleCopyText(msg.id, msg.text)
+                              : undefined
+                          }
+                          onCopyMarkdown={
+                            !msg.isUser && msg.id
+                              ? () => handleCopyMarkdown(msg.id, msg.text)
+                              : undefined
+                          }
+                          onSave={
+                            !msg.isUser && msg.id
+                              ? () => handleSave(msg.id, currentProblemSlug)
+                              : undefined
+                          }
+                          onRetry={
+                            !msg.isUser && msg.id
+                              ? () => handleRetry(msg.id)
+                              : undefined
+                          }
                           feedback={feedbacks[msg.id]}
                         />
                       ))}

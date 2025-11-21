@@ -35,7 +35,7 @@ describe("ChatMessage", () => {
   it("renders a copy button for code blocks", () => {
     const code = '```javascript\nconsole.log("hello");\n```';
     render(<ChatMessage text={code} isUser={false} />);
-    expect(document.querySelector('.copy-button')).toBeInTheDocument();
+    expect(document.querySelector(".copy-button")).toBeInTheDocument();
   });
 
   it("renders user message with streaming status", () => {
@@ -274,6 +274,8 @@ describe("ChatMessage", () => {
     };
     render(<ChatMessage message={message} />);
     // Should render as user message despite sender being "bot"
-    expect(screen.getByText("Hello").closest(".user-message")).toBeInTheDocument();
+    expect(
+      screen.getByText("Hello").closest(".user-message"),
+    ).toBeInTheDocument();
   });
 });
