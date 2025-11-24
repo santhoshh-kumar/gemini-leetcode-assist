@@ -1,4 +1,4 @@
-import { callGeminiApi } from "@/utils/gemini";
+import { callGeminiApi, SYSTEM_PROMPT } from "@/utils/gemini";
 import { Chat } from "@/state/slices/chatSlice";
 
 // Mock the GoogleGenAI library
@@ -675,5 +675,68 @@ describe("callGeminiApi", () => {
       // Should yield no chunks since all are empty
       expect(chunks).toHaveLength(0);
     });
+  });
+});
+
+describe("SYSTEM_PROMPT", () => {
+  it("should be exported and accessible", () => {
+    expect(SYSTEM_PROMPT).toBeDefined();
+  });
+
+  it("should be a non-empty string", () => {
+    expect(typeof SYSTEM_PROMPT).toBe("string");
+    expect(SYSTEM_PROMPT.length).toBeGreaterThan(0);
+  });
+
+  it("should contain key instructional phrases", () => {
+    // Verify it contains guidance about being a competitive programming mentor
+    expect(SYSTEM_PROMPT).toContain("competitive programmer");
+    expect(SYSTEM_PROMPT).toContain("mentor");
+
+    // Verify it contains guidance about not revealing solutions
+    expect(SYSTEM_PROMPT).toContain("Do NOT reveal full solutions");
+
+    // Verify it contains formatting requirements
+    expect(SYSTEM_PROMPT).toContain("FORMATTING REQUIREMENTS");
+  });
+
+  it("should be used in callGeminiApi systemInstruction", async () => {
+    mockGenerateContentStream.mockResolvedValue(
+      (async function* () {
+        yield {
+          candidates: [
+            {
+              content: {
+                parts: [{ text: "response" }],
+              },
+            },
+          ],
+        };
+      })(),
+    );
+
+    const apiKey = "test-api-key";
+    const modelName = "gemini-pro";
+    const chatHistory: Chat["messages"] = [];
+    const problemDetails = null;
+    const userCode = null;
+    const currentUserMessage = "Hello";
+
+    const generator = callGeminiApi(
+      apiKey,
+      modelName,
+      chatHistory,
+      problemDetails,
+      userCode,
+      null,
+      currentUserMessage,
+      false,
+    );
+
+    await generator.next();
+
+    // Verify SYSTEM_PROMPT is used in the API call
+    const callArgs = mockGenerateContentStream.mock.calls[0][0];
+    expect(callArgs.config.systemInstruction).toBe(SYSTEM_PROMPT);
   });
 });

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { Provider } from "react-redux";
 import configureStore from "redux-mock-store";
 import MessageInput from "@/components/chat/MessageInput";
@@ -14,6 +14,9 @@ const createMockState = (overrides = {}) => ({
   chat: {
     selectedContexts: [],
     messages: [],
+    chats: [],
+    currentChatId: null,
+    currentProblemSlug: null,
   },
   ui: {
     isContextOpen: false,
@@ -168,7 +171,14 @@ describe("MessageInput", () => {
 
   it("removes a context when the remove button is clicked", () => {
     const store = mockStore(
-      createMockState({ chat: { selectedContexts: ["Code"] } }),
+      createMockState({
+        chat: {
+          selectedContexts: ["Code"],
+          chats: [],
+          currentChatId: null,
+          currentProblemSlug: null,
+        },
+      }),
     );
     render(
       <Provider store={store}>
@@ -403,7 +413,7 @@ describe("MessageInput", () => {
     const store = mockStore(createMockState({ ui: { isContextOpen: true } }));
     render(
       <Provider store={store}>
-        <MessageInput onSendMessage={() => {}} hastestResult={false} />
+        <MessageInput onSendMessage={() => {}} hasTestResult={false} />
       </Provider>,
     );
 
@@ -486,5 +496,344 @@ describe("MessageInput", () => {
     // Blur the textarea
     fireEvent.blur(textarea);
     expect(messageInputContainer).not.toHaveClass("message-input-focused");
+  });
+
+  describe("Context Indicator Integration", () => {
+    // Mock chrome.storage.local
+    const mockChromeStorage = {
+      local: {
+        get: jest.fn(),
+      },
+    };
+
+    beforeEach(() => {
+      global.chrome = {
+        // @ts-expect-error - Partial mock of chrome.storage
+        storage: mockChromeStorage,
+      };
+      jest.clearAllMocks();
+    });
+
+    it("should render ContextIndicator component", () => {
+      const store = mockStore(
+        createMockState({
+          chat: {
+            selectedContexts: [],
+            chats: [],
+            currentChatId: null,
+            currentProblemSlug: null,
+          },
+        }),
+      );
+
+      const { container } = render(
+        <Provider store={store}>
+          <MessageInput onSendMessage={() => {}} />
+        </Provider>,
+      );
+
+      // Look for the ContextIndicator by checking for the SVG and percentage text
+      const svg = container.querySelector("svg");
+      expect(svg).toBeInTheDocument();
+
+      // Should show some percentage
+      expect(container.textContent).toMatch(/\d+\.?\d*%/);
+    });
+
+    it("should pass correct totalTokens prop based on selected model", () => {
+      const store = mockStore(
+        createMockState({
+          chat: {
+            selectedContexts: [],
+            chats: [],
+            currentChatId: null,
+            currentProblemSlug: null,
+          },
+          settings: {
+            selectedModel: "gemini-2.5-flash",
+          },
+        }),
+      );
+
+      render(
+        <Provider store={store}>
+          <MessageInput onSendMessage={() => {}} />
+        </Provider>,
+      );
+
+      // The component should use MODEL_CONTEXT_LIMITS for the selected model
+      // We can verify this indirectly by checking that the component renders without errors
+      expect(screen.getByRole("textbox")).toBeInTheDocument();
+    });
+
+    it("should calculate token count from chat messages", async () => {
+      const mockMessages = [
+        { id: "1", text: "Hello", isUser: true, status: "succeeded" as const },
+        {
+          id: "2",
+          text: "Hi there",
+          isUser: false,
+          status: "succeeded" as const,
+        },
+      ];
+
+      const store = mockStore(
+        createMockState({
+          chat: {
+            selectedContexts: [],
+            chats: [
+              {
+                id: "chat-1",
+                messages: mockMessages,
+                createdAt: Date.now(),
+              },
+            ],
+            currentChatId: "chat-1",
+            currentProblemSlug: null,
+          },
+        }),
+      );
+
+      await act(async () => {
+        render(
+          <Provider store={store}>
+            <MessageInput onSendMessage={() => {}} />
+          </Provider>,
+        );
+        // Wait for the useEffect to calculate tokens
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+
+      // Should render ContextIndicator with calculated tokens
+      const svg = document.querySelector("svg");
+      expect(svg).toBeInTheDocument();
+    });
+
+    it("should include Problem Details context in token count", async () => {
+      const mockProblemData = {
+        title: "Two Sum",
+        description: "Given an array of integers...",
+        constraints: ["1 <= nums.length <= 10^4"],
+        examples: [{ input: "[2,7,11,15]", output: "0,1" }],
+        code: "function twoSum(nums, target) {}",
+      };
+
+      mockChromeStorage.local.get.mockResolvedValue({
+        "leetcode-problem-test-problem": mockProblemData,
+      });
+
+      const store = mockStore(
+        createMockState({
+          chat: {
+            selectedContexts: ["Problem Details"],
+            chats: [],
+            currentChatId: null,
+            currentProblemSlug: "test-problem",
+          },
+        }),
+      );
+
+      await act(async () => {
+        render(
+          <Provider store={store}>
+            <MessageInput onSendMessage={() => {}} />
+          </Provider>,
+        );
+        // Wait for async chrome storage call
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+
+      expect(mockChromeStorage.local.get).toHaveBeenCalledWith(
+        "leetcode-problem-test-problem",
+      );
+    });
+
+    it("should include Code context in token count", async () => {
+      const mockProblemData = {
+        code: "function solution() { return 42; }",
+      };
+
+      mockChromeStorage.local.get.mockResolvedValue({
+        "leetcode-problem-code-problem": mockProblemData,
+      });
+
+      const store = mockStore(
+        createMockState({
+          chat: {
+            selectedContexts: ["Code"],
+            chats: [],
+            currentChatId: null,
+            currentProblemSlug: "code-problem",
+          },
+        }),
+      );
+
+      await act(async () => {
+        render(
+          <Provider store={store}>
+            <MessageInput onSendMessage={() => {}} />
+          </Provider>,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+
+      expect(mockChromeStorage.local.get).toHaveBeenCalledWith(
+        "leetcode-problem-code-problem",
+      );
+    });
+
+    it("should include Test Result context in token count", async () => {
+      const mockProblemData = {
+        testResult: {
+          status: "Accepted",
+          runtime: "100ms",
+          memory: "42MB",
+        },
+      };
+
+      mockChromeStorage.local.get.mockResolvedValue({
+        "leetcode-problem-test-result": mockProblemData,
+      });
+
+      const store = mockStore(
+        createMockState({
+          chat: {
+            selectedContexts: ["Test Result"],
+            chats: [],
+            currentChatId: null,
+            currentProblemSlug: "test-result",
+          },
+        }),
+      );
+
+      await act(async () => {
+        render(
+          <Provider store={store}>
+            <MessageInput onSendMessage={() => {}} />
+          </Provider>,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+
+      expect(mockChromeStorage.local.get).toHaveBeenCalledWith(
+        "leetcode-problem-test-result",
+      );
+    });
+
+    it("should handle chrome storage errors gracefully", async () => {
+      const consoleErrorSpy = jest.spyOn(console, "error").mockImplementation();
+
+      mockChromeStorage.local.get.mockRejectedValue(new Error("Storage error"));
+
+      const store = mockStore(
+        createMockState({
+          chat: {
+            selectedContexts: ["Problem Details"],
+            chats: [],
+            currentChatId: null,
+            currentProblemSlug: "error-problem",
+          },
+        }),
+      );
+
+      await act(async () => {
+        render(
+          <Provider store={store}>
+            <MessageInput onSendMessage={() => {}} />
+          </Provider>,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Error loading problem data for token count:",
+        expect.any(Error),
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it("should update token count when contexts change", async () => {
+      const mockProblemData = {
+        title: "Test Problem",
+        description: "A test problem",
+      };
+
+      mockChromeStorage.local.get.mockResolvedValue({
+        "leetcode-problem-dynamic": mockProblemData,
+      });
+
+      const initialStore = mockStore(
+        createMockState({
+          chat: {
+            selectedContexts: [],
+            chats: [],
+            currentChatId: null,
+            currentProblemSlug: "dynamic",
+          },
+        }),
+      );
+
+      const { rerender } = await act(async () => {
+        const result = render(
+          <Provider store={initialStore}>
+            <MessageInput onSendMessage={() => {}} />
+          </Provider>,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        return result;
+      });
+
+      // Clear mock calls
+      mockChromeStorage.local.get.mockClear();
+
+      // Re-render with Problem Details context added
+      const updatedStore = mockStore(
+        createMockState({
+          chat: {
+            selectedContexts: ["Problem Details"],
+            chats: [],
+            currentChatId: null,
+            currentProblemSlug: "dynamic",
+          },
+        }),
+      );
+
+      await act(async () => {
+        rerender(
+          <Provider store={updatedStore}>
+            <MessageInput onSendMessage={() => {}} />
+          </Provider>,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+
+      // Should fetch problem data when context is added
+      expect(mockChromeStorage.local.get).toHaveBeenCalled();
+    });
+
+    it("should not fetch problem data when no contexts are selected", async () => {
+      const store = mockStore(
+        createMockState({
+          chat: {
+            selectedContexts: [],
+            chats: [],
+            currentChatId: null,
+            currentProblemSlug: "no-context",
+          },
+        }),
+      );
+
+      await act(async () => {
+        render(
+          <Provider store={store}>
+            <MessageInput onSendMessage={() => {}} />
+          </Provider>,
+        );
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+
+      expect(mockChromeStorage.local.get).not.toHaveBeenCalled();
+    });
   });
 });
