@@ -245,7 +245,7 @@ const ChatWindow: FC = () => {
         const currentChat = chats
           ? chats.find((chat) => chat.id === chatId)
           : null;
-        const chatHistory = currentChat ? currentChat.messages.slice(-10) : [];
+        const chatHistory = currentChat ? currentChat.messages : [];
 
         // Start streaming message with empty text
         dispatch(

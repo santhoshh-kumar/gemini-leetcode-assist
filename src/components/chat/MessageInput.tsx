@@ -1,11 +1,36 @@
-import { FC, useState, useEffect, useRef } from "react";
+import { FC, useState, useEffect, useRef, useMemo } from "react";
 import { ArrowRight, Bot, Link, X, ChevronDown } from "lucide-react";
-import { useDispatch, useSelector } from "react-redux";
-import { RootState } from "@/state/store.ts";
-import { addContext, removeContext } from "@/state/slices/chatSlice.ts";
-import { setSelectedModel } from "@/state/slices/settingsSlice.ts";
-import { MODEL_DISPLAY_NAMES } from "@/utils/models";
-import { setContextOpen, setModelMenuOpen } from "@/state/slices/uiSlice.ts";
+import { useDispatch, useSelector, shallowEqual } from "react-redux";
+import { RootState } from "@/state/store";
+import { addContext, removeContext } from "@/state/slices/chatSlice";
+import { setSelectedModel } from "@/state/slices/settingsSlice";
+import {
+  MODEL_DISPLAY_NAMES,
+  MODEL_CONTEXT_LIMITS,
+  estimateTokenCount,
+  DEFAULT_MODEL,
+} from "@/utils/models";
+import { setContextOpen, setModelMenuOpen } from "@/state/slices/uiSlice";
+import { SYSTEM_PROMPT } from "@/utils/gemini";
+import ContextIndicator from "./ContextIndicator";
+
+// Define constants for context types and storage keys
+const CONTEXT_TYPES = {
+  PROBLEM_DETAILS: "Problem Details",
+  CODE: "Code",
+  TEST_RESULT: "Test Result",
+} as const;
+
+const STORAGE_KEY_PREFIX = "leetcode-problem-";
+
+interface ProblemData {
+  title?: string;
+  description?: string;
+  constraints?: string;
+  examples?: string;
+  code?: string;
+  testResult?: unknown;
+}
 
 interface MessageInputProps {
   onSendMessage: (message: string) => void;
@@ -18,6 +43,7 @@ const MessageInput: FC<MessageInputProps> = ({
 }) => {
   const [message, setMessage] = useState("");
   const [isTextareaFocused, setIsTextareaFocused] = useState(false);
+  const [currentTokenCount, setCurrentTokenCount] = useState(0);
   const dispatch = useDispatch();
 
   const { isContextOpen, isModelMenuOpen } = useSelector(
@@ -25,12 +51,41 @@ const MessageInput: FC<MessageInputProps> = ({
   );
   // select the chat slice then derive selectedContexts to avoid returning new references
   const chatSlice = useSelector((state: RootState) => state.chat);
-  const selectedContexts: string[] = chatSlice?.selectedContexts ?? [];
+  const selectedContexts = useMemo(
+    () => chatSlice?.selectedContexts ?? [],
+    [chatSlice?.selectedContexts],
+  );
   const { selectedModel } = useSelector((state: RootState) => state.settings);
+  const { currentProblemSlug, chats, currentChatId } = useSelector(
+    (state: RootState) => ({
+      currentProblemSlug: state.chat.currentProblemSlug,
+      chats: state.chat.chats,
+      currentChatId: state.chat.currentChatId,
+    }),
+    shallowEqual, // To prevent unnecessary re-renders
+  );
 
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Configuration object for extracting token-relevant content from problem data
+  const contextTokenExtractors: Record<string, (data: ProblemData) => string> =
+    useMemo(
+      () => ({
+        [CONTEXT_TYPES.PROBLEM_DETAILS]: (data) =>
+          JSON.stringify({
+            title: data.title,
+            description: data.description,
+            constraints: data.constraints,
+            examples: data.examples,
+          }),
+        [CONTEXT_TYPES.CODE]: (data) => data.code || "",
+        [CONTEXT_TYPES.TEST_RESULT]: (data) =>
+          data.testResult ? JSON.stringify(data.testResult) : "",
+      }),
+      [],
+    );
 
   // Auto-resize textarea based on content
   useEffect(() => {
@@ -75,6 +130,69 @@ const MessageInput: FC<MessageInputProps> = ({
       textarea.scrollTop = scrollTop;
     }
   }, [message]);
+
+  // Get current chat messages for token calculation
+  const currentChatMessages = useMemo(() => {
+    const currentChat = chats.find((chat) => chat.id === currentChatId);
+    return currentChat ? currentChat.messages : [];
+  }, [chats, currentChatId]);
+
+  // Calculate token count for context window indicator
+  // This effect runs when chat messages or contexts change
+  useEffect(() => {
+    let cancelled = false;
+
+    const calculateTokens = async () => {
+      let total = estimateTokenCount(SYSTEM_PROMPT);
+
+      // Add all chat messages to token count
+      currentChatMessages.forEach((msg) => {
+        total += estimateTokenCount(msg.text);
+      });
+
+      // Add context data if available
+      if (selectedContexts.length > 0 && currentProblemSlug) {
+        try {
+          const key = `${STORAGE_KEY_PREFIX}${currentProblemSlug}`;
+          const result = await chrome.storage.local.get(key);
+
+          // Check if this effect run has been cancelled
+          if (cancelled) return;
+
+          const problemData = result[key];
+
+          if (problemData) {
+            selectedContexts.forEach((context) => {
+              if (contextTokenExtractors[context]) {
+                total += estimateTokenCount(
+                  contextTokenExtractors[context](problemData),
+                );
+              }
+            });
+          }
+        } catch (e) {
+          console.error("Error loading problem data for token count:", e);
+        }
+      }
+
+      // Only update state if this effect run hasn't been cancelled
+      if (!cancelled) {
+        setCurrentTokenCount(total);
+      }
+    };
+
+    calculateTokens();
+
+    // Cleanup function: mark this effect run as cancelled
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedContexts,
+    currentChatMessages,
+    currentProblemSlug,
+    contextTokenExtractors,
+  ]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -142,24 +260,24 @@ const MessageInput: FC<MessageInputProps> = ({
           {isContextOpen && (
             <div className="absolute bottom-full mb-2 w-40 bg-[#3a3a3a] border border-gray-500 rounded-md shadow-lg z-10">
               <button
-                onClick={() => handleAddContext("Problem Details")}
+                onClick={() => handleAddContext(CONTEXT_TYPES.PROBLEM_DETAILS)}
                 className="block w-full text-left px-3 py-1 text-sm text-white/80 hover:bg-gray-700"
               >
-                Problem Details
+                {CONTEXT_TYPES.PROBLEM_DETAILS}
               </button>
               <button
-                onClick={() => handleAddContext("Code")}
+                onClick={() => handleAddContext(CONTEXT_TYPES.CODE)}
                 className="block w-full text-left px-3 py-1 text-sm text-white/80 hover:bg-gray-700"
               >
-                Code
+                {CONTEXT_TYPES.CODE}
               </button>
               <button
-                onClick={() => handleAddContext("Test Result")}
+                onClick={() => handleAddContext(CONTEXT_TYPES.TEST_RESULT)}
                 className={`block w-full text-left px-3 py-1 text-sm ${hasTestResult ? "text-white/80 hover:bg-gray-700" : "text-white/40 cursor-not-allowed"}`}
                 disabled={!hasTestResult}
                 title={hasTestResult ? undefined : "Please run the code first"}
               >
-                Test Result
+                {CONTEXT_TYPES.TEST_RESULT}
               </button>
             </div>
           )}
@@ -236,6 +354,13 @@ const MessageInput: FC<MessageInputProps> = ({
               </div>
             )}
           </div>
+          <ContextIndicator
+            usedTokens={currentTokenCount}
+            totalTokens={
+              MODEL_CONTEXT_LIMITS[selectedModel] ||
+              MODEL_CONTEXT_LIMITS[DEFAULT_MODEL]
+            }
+          />
         </div>
         <button
           id="gemini-chat-send-button"
