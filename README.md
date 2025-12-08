@@ -6,18 +6,8 @@
 [![Powered by Gemini](https://img.shields.io/badge/AI-Gemini-4285F4)](https://deepmind.google/technologies/gemini/)
 
 An AI-powered Chrome extension designed to enhance your LeetCode problem-solving experience.  
-Built with **React, Redux, TypeScript, and TailwindCSS**, it integrates seamlessly with the LeetCode problem interface to provide **AI-powered hints, explanations, and interview-style assistance directly inside LeetCode using Gemini**.
+Built with **React, Redux, TypeScript, and TailwindCSS**, it integrates seamlessly with the LeetCode problem interface to provide **solution-free socratic questions/hints like a mentor** to improve your problem-solving skills.
 
----
-
-## Features
-
-- **Live AI Guidance** – Get instant explanations and insights while solving problems.
-- **Interactive Interview Mode** – Practice by discussing your approach with the assistant, simulating real interview scenarios.
-- **Problem-Specific Chat Help** – Ask context-aware questions tied to the exact problem you are working on.
-- **Image Context Support** – Upload diagrams or screenshots to enhance your discussions.
-
----
 
 ## Getting Started
 
@@ -31,20 +21,12 @@ Built with **React, Redux, TypeScript, and TailwindCSS**, it integrates seamless
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/santhoshkumarCodes/gemini-leetcode-assist.git
+    git clone https://github.com/santhoshh-kumar/gemini-leetcode-assist.git
     ```
 2.  Install the dependencies:
     ```bash
     npm install
     ```
-
-### Running the Development Server
-
-```bash
-npm run dev
-```
-
-This will start the Vite development server and watch for changes in the source files.
 
 ### Building the Extension
 
