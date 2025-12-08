@@ -8,7 +8,6 @@
 An AI-powered Chrome extension designed to enhance your LeetCode problem-solving experience.  
 Built with **React, Redux, TypeScript, and TailwindCSS**, it integrates seamlessly with the LeetCode problem interface to provide **solution-free socratic questions/hints like a mentor** to improve your problem-solving skills.
 
-
 ## Getting Started
 
 ### Prerequisites
