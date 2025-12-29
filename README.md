@@ -10,7 +10,6 @@ Built with **React, Redux, TypeScript, and TailwindCSS**, it integrates seamless
 
 <img width="852" height="898" alt="Screenshot from 2025-12-08 20-33-32" src="https://github.com/user-attachments/assets/4641c1e3-c585-4513-a54c-32078a2e31bd" />
 
-
 ## Getting Started
 
 ### Prerequisites
